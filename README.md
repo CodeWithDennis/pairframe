@@ -4,6 +4,19 @@ NativePHP desktop app to compose two screenshots into split thumbnails with back
 
 ![Pairframe composing a diagonal wavy split thumbnail](docs/pairframe.png)
 
+## Downloads
+
+Prebuilt macOS and Windows installers are available on the [GitHub Releases](https://github.com/CodeWithDennis/pairframe/releases) page.
+
+**These builds are unsigned.** macOS Gatekeeper will block them until you allow the app:
+
+1. Try to open Pairframe (you may see “cannot be opened” / “damaged” / “unidentified developer”).
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to the blocked-app message and choose **Open Anyway** / **Allow**.
+4. Confirm again if macOS asks.
+
+Alternatively, skip the release binaries and [build or run the app yourself locally](#run-as-desktop-app) — that does not require changing privacy settings for a downloaded installer.
+
 ## Requirements
 
 - PHP 8.3+
