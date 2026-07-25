@@ -4,10 +4,84 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'Pairframe') }}</title>
+    <link rel="icon" type="image/png" href="/icon.png">
     @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        #boot-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            background: #FAFAFA;
+            color: #171717;
+            transition: opacity 0.35s ease, visibility 0.35s ease;
+        }
+        #boot-screen.is-done {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        #boot-screen .boot-mark {
+            width: 44px;
+            height: 44px;
+            color: #171717;
+        }
+        #boot-screen .boot-name {
+            font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+        #boot-screen .boot-name span {
+            color: #a3a3a3;
+        }
+        #boot-screen .boot-bar {
+            width: 88px;
+            height: 2px;
+            margin-top: 0.35rem;
+            overflow: hidden;
+            background: #EBEBEB;
+            border-radius: 999px;
+        }
+        #boot-screen .boot-bar > i {
+            display: block;
+            width: 40%;
+            height: 100%;
+            background: #171717;
+            border-radius: 999px;
+            animation: boot-slide 1s ease-in-out infinite;
+        }
+        @keyframes boot-slide {
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(280%); }
+        }
+    </style>
 </head>
 <body class="h-dvh overflow-hidden bg-lumis-canvas font-sans font-normal text-lumis-ink" x-data="pairframe">
+    {{-- Shown before Vite/Alpine are ready --}}
+    <div id="boot-screen" aria-live="polite" aria-busy="true">
+        <svg class="boot-mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <defs>
+                <clipPath id="boot-pf-mark">
+                    <rect x="3" y="7" width="22" height="14" rx="2.25"/>
+                </clipPath>
+            </defs>
+            <rect x="3" y="7" width="22" height="14" rx="2.25" stroke="currentColor" stroke-width="1.75"/>
+            <g clip-path="url(#boot-pf-mark)">
+                <path d="M3 21 15 7H3v14Z" fill="currentColor"/>
+                <path d="M9 21 19 7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </g>
+        </svg>
+        <div class="boot-name">Pair<span>frame</span></div>
+        <div class="boot-bar" aria-hidden="true"><i></i></div>
+    </div>
+
     <div class="flex h-dvh flex-col">
         {{-- Header --}}
         <header class="flex h-14 shrink-0 items-center justify-between border-b border-lumis-panel-line bg-lumis-panel-surface px-5">
@@ -509,5 +583,23 @@
     <style>
         [x-cloak] { display: none !important; }
     </style>
+    <script>
+        (() => {
+            const dismiss = () => {
+                const screen = document.getElementById('boot-screen');
+                if (!screen || screen.classList.contains('is-done')) {
+                    return;
+                }
+                screen.classList.add('is-done');
+                screen.setAttribute('aria-busy', 'false');
+                window.setTimeout(() => screen.remove(), 400);
+            };
+
+            document.addEventListener('alpine:initialized', () => {
+                requestAnimationFrame(() => requestAnimationFrame(dismiss));
+            });
+            window.addEventListener('load', () => window.setTimeout(dismiss, 1200));
+        })();
+    </script>
 </body>
 </html>
