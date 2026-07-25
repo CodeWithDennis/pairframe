@@ -1,0 +1,18 @@
+---
+description: PR review checklist for Pairframe
+alwaysApply: false
+---
+
+# Pairframe PR review
+
+## Before merge
+
+- `composer ci` must be green locally or via GitHub Actions (Pint, PHPStan, Rector dry-run, tests).
+- On PRs: use the Bugbot-review and Security-review skills.
+
+## Focus areas
+
+- Frontend compositor: `resources/js/{app,compositor,patterns}.js` — layout math, export/download, canvas masks.
+- NativePHP: window/provider setup (`app/Providers/NativeAppServiceProvider.php`), no secrets or tokens in client builds.
+- Vite build must succeed (`npm run build`); stale `public/hot` should not ship.
+- Prefer small, reviewable diffs; keep PHP thin and JS changes intentional.
