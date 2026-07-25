@@ -79,8 +79,25 @@ jobs:
           echo "NATIVEPHP_APP_VERSION=${VERSION}" >> .env
           echo "Building Pairframe ${VERSION} for ${{ matrix.platform }}-${{ matrix.arch }}"
 
+      # Do not use --publish: NativePHP's electronPath($subpath) resolves published
+      # roots incorrectly, so icons would land in vendor while electron-builder
+      # still packs the default NativePHP icon from nativephp/electron/build.
       - name: Install NativePHP Electron scaffold
-        run: php artisan native:install --force --publish --no-interaction
+        run: php artisan native:install --force --no-interaction
+
+      - name: Install app icons into Electron build resources
+        shell: bash
+        run: |
+          for dir in \
+            "vendor/nativephp/desktop/resources/electron/build" \
+            "vendor/nativephp/desktop/resources/build" \
+            "nativephp/electron/build"
+          do
+            mkdir -p "$dir"
+            cp public/icon.png "$dir/icon.png"
+            # Prefer regenerating platform icons from our PNG
+            rm -f "$dir/icon.icns" "$dir/icon.ico"
+          done
 
       - name: Build frontend assets
         run: npm run build
