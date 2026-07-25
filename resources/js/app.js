@@ -1,142 +1,69 @@
 import Alpine from 'alpinejs';
 import { createCompositor } from './compositor.js';
 
+const PRESETS_STORAGE_KEY = 'pairframe.presets';
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('pairframe', () => ({
-        lightImage: null,
-        darkImage: null,
-        lightName: '',
-        darkName: '',
-        lightMeta: '',
-        darkMeta: '',
+        imageA: null,
+        imageB: null,
+        nameA: '',
+        nameB: '',
+        metaA: '',
+        metaB: '',
         sizeWarning: '',
 
         baseWidth: 1280,
         baseHeight: 720,
 
-        layoutFamily: 'vertical',
-        layoutVariant: 'hard',
+        layout: 'vertical',
+        diagonalAngle: Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10,
+        diagonalStyle: 'straight',
+        diagonalDensity: 1.5,
         splitPosition: 50,
-        softEdge: 0,
+        previewTool: 'position',
         swapSides: false,
-        flipDirection: false,
-        invertMask: false,
-        maskDensity: 28,
-        fitMode: 'cover',
+        imagePadding: 0,
+        imageRadius: 0,
 
-        overlapOffsetX: 14,
-        overlapOffsetY: 12,
-        overlapShadow: 28,
-
-        backgroundType: 'solid',
+        backgroundType: 'dots',
         backgroundBg: '#FAFAFA',
         backgroundFg: '#E5E5E5',
         backgroundDensity: 24,
 
         exportScale: '1',
-        customMaxWidth: '',
         exportPng: true,
-        exportJpg: true,
+        exportJpg: false,
         jpgQuality: 92,
         exporting: false,
         statusMessage: '',
 
-        dragging: false,
-        previewMetrics: { scale: 1, drawWidth: 0, drawHeight: 0 },
+        presets: [],
+        presetName: '',
+        activePresetId: null,
+        selectedLoadPresetId: null,
+        presetModalOpen: false,
+        loadPresetModalOpen: false,
 
+        dragging: false,
+        dragPivot: null,
+        previewHovered: false,
+        dropActive: false,
+        previewMetrics: { scale: 1, drawWidth: 0, drawHeight: 0 },
         compositor: null,
 
-        layoutFamilies: [
-            {
-                id: 'vertical',
-                label: 'Vertical',
-                variants: [
-                    { id: 'hard', label: 'Hard' },
-                    { id: 'soft', label: 'Soft' },
-                    { id: 'blinds', label: 'Blinds' },
-                    { id: 'band', label: 'Center band' },
-                ],
-            },
-            {
-                id: 'horizontal',
-                label: 'Horizontal',
-                variants: [
-                    { id: 'hard', label: 'Hard' },
-                    { id: 'soft', label: 'Soft' },
-                    { id: 'blinds', label: 'Blinds' },
-                    { id: 'band', label: 'Center band' },
-                ],
-            },
-            {
-                id: 'diagonal',
-                label: 'Diagonal',
-                variants: [
-                    { id: 'tl', label: 'Top left' },
-                    { id: 'tr', label: 'Top right' },
-                    { id: 'tl-soft', label: 'Soft TL' },
-                    { id: 'tr-soft', label: 'Soft TR' },
-                    { id: 'corner', label: 'Corner peel' },
-                ],
-            },
-            {
-                id: 'fade',
-                label: 'Soft fade',
-                variants: [
-                    { id: 'lr', label: 'Left / right' },
-                    { id: 'tb', label: 'Top / bottom' },
-                ],
-            },
-            {
-                id: 'zigzag',
-                label: 'Zigzag',
-                variants: [
-                    { id: 'sharp', label: 'Sharp' },
-                    { id: 'soft', label: 'Soft' },
-                    { id: 'deep', label: 'Deep' },
-                ],
-            },
-            {
-                id: 'wave',
-                label: 'Wave',
-                variants: [
-                    { id: 'sine', label: 'Sine' },
-                    { id: 'soft', label: 'Soft' },
-                    { id: 'wide', label: 'Wide' },
-                ],
-            },
-            {
-                id: 'checker',
-                label: 'Checker',
-                variants: [
-                    { id: 'even', label: 'Even' },
-                    { id: 'fine', label: 'Fine' },
-                    { id: 'large', label: 'Large' },
-                ],
-            },
-            {
-                id: 'stripes',
-                label: 'Stripes',
-                variants: [
-                    { id: 'vertical', label: 'Vertical' },
-                    { id: 'horizontal', label: 'Horizontal' },
-                    { id: 'diagonal', label: 'Diagonal' },
-                ],
-            },
-            {
-                id: 'overlap',
-                label: 'Overlap',
-                variants: [
-                    { id: 'cards', label: 'Cards' },
-                    { id: 'stack', label: 'Stack' },
-                    { id: 'side', label: 'Side by side' },
-                ],
-            },
+        layouts: [
+            { id: 'vertical', label: 'Vertical' },
+            { id: 'horizontal', label: 'Horizontal' },
+            { id: 'diagonal', label: 'Diagonal' },
         ],
 
-        ratioPresets: [
-            { id: '30', label: '30 / 70', value: 30 },
-            { id: '50', label: '50 / 50', value: 50 },
-            { id: '70', label: '70 / 30', value: 70 },
+        diagonalStyles: [
+            { id: 'straight', label: 'Straight' },
+            { id: 'wavy', label: 'Wavy' },
+            { id: 'zigzag', label: 'Zigzag' },
+            { id: 'scallop', label: 'Scallop' },
+            { id: 'soft', label: 'Soft' },
         ],
 
         backgroundOptions: [
@@ -151,42 +78,36 @@ document.addEventListener('alpine:init', () => {
 
         init() {
             this.compositor = createCompositor();
+            this.loadPresets();
             this.$watch(
                 () => [
-                    this.layoutFamily,
-                    this.layoutVariant,
+                    this.layout,
+                    this.diagonalAngle,
+                    this.diagonalStyle,
+                    this.diagonalDensity,
                     this.splitPosition,
-                    this.softEdge,
                     this.swapSides,
-                    this.flipDirection,
-                    this.invertMask,
-                    this.maskDensity,
-                    this.fitMode,
-                    this.overlapOffsetX,
-                    this.overlapOffsetY,
-                    this.overlapShadow,
+                    this.imagePadding,
+                    this.imageRadius,
                     this.backgroundType,
                     this.backgroundBg,
                     this.backgroundFg,
                     this.backgroundDensity,
                     this.baseWidth,
                     this.baseHeight,
-                    this.lightImage,
-                    this.darkImage,
+                    this.imageA,
+                    this.imageB,
                 ],
                 () => this.render(),
             );
 
             this.$nextTick(() => this.render());
-
-            this._onResize = () => {
-                this.updateHandle();
-            };
+            this._onResize = () => this.updateHandle();
             window.addEventListener('resize', this._onResize);
         },
 
         get canExport() {
-            return Boolean(this.lightImage && this.darkImage) && (this.exportPng || this.exportJpg);
+            return Boolean(this.imageA && this.imageB) && (this.exportPng || this.exportJpg);
         },
 
         get exportSizeLabel() {
@@ -198,33 +119,21 @@ document.addEventListener('alpine:init', () => {
             return `${this.baseWidth} × ${this.baseHeight}`;
         },
 
-        get currentVariants() {
-            const family = this.layoutFamilies.find((item) => item.id === this.layoutFamily);
-            return family?.variants || [];
-        },
-
-        get showsSplitControls() {
-            return !['overlap', 'checker', 'stripes'].includes(this.layoutFamily);
-        },
-
-        get showsSoftEdge() {
-            return ['vertical', 'horizontal', 'diagonal', 'fade', 'zigzag', 'wave'].includes(this.layoutFamily);
-        },
-
-        get showsMaskDensity() {
-            if (['zigzag', 'wave', 'checker', 'stripes'].includes(this.layoutFamily)) {
-                return true;
-            }
-            return ['vertical', 'horizontal'].includes(this.layoutFamily)
-                && ['blinds', 'band'].includes(this.layoutVariant);
-        },
-
-        get showsOverlapControls() {
-            return this.layoutFamily === 'overlap';
+        get hasBothImages() {
+            return Boolean(this.imageA && this.imageB);
         },
 
         get showsDragHandle() {
-            return this.showsSplitControls && this.lightImage && this.darkImage;
+            return this.hasBothImages && (this.previewHovered || this.dragging);
+        },
+
+        setPreviewHovered(hovered) {
+            this.previewHovered = hovered;
+            this.$nextTick(() => this.updateHandle());
+        },
+
+        get showsDiagonalDensity() {
+            return this.layout === 'diagonal' && this.diagonalStyle !== 'straight' && this.diagonalStyle !== 'soft';
         },
 
         segmentClass(active) {
@@ -233,13 +142,239 @@ document.addEventListener('alpine:init', () => {
                 : 'bg-lumis-segment-idle text-lumis-ink hover:bg-zinc-200';
         },
 
-        selectFamily(familyId) {
-            this.layoutFamily = familyId;
-            const family = this.layoutFamilies.find((item) => item.id === familyId);
-            this.layoutVariant = family?.variants?.[0]?.id || 'hard';
+        clampSlider(key, min, max) {
+            const value = Number(this[key]);
+            this[key] = Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
         },
 
-        async loadFile(file, side) {
+        selectLayout(id) {
+            this.layout = id;
+            this.previewTool = id === 'diagonal' ? 'angle' : 'position';
+        },
+
+        setPreviewTool(tool) {
+            this.previewTool = tool;
+            this.$nextTick(() => this.updateHandle());
+        },
+
+        captureSettings() {
+            return {
+                layout: this.layout,
+                diagonalAngle: this.diagonalAngle,
+                diagonalStyle: this.diagonalStyle,
+                diagonalDensity: this.diagonalDensity,
+                splitPosition: this.splitPosition,
+                swapSides: this.swapSides,
+                imagePadding: this.imagePadding,
+                imageRadius: this.imageRadius,
+                backgroundType: this.backgroundType,
+                backgroundBg: this.backgroundBg,
+                backgroundFg: this.backgroundFg,
+                backgroundDensity: this.backgroundDensity,
+                exportScale: this.exportScale,
+                exportPng: this.exportPng,
+                exportJpg: this.exportJpg,
+                jpgQuality: this.jpgQuality,
+            };
+        },
+
+        applySettings(settings = {}) {
+            if (!settings || typeof settings !== 'object') {
+                return;
+            }
+
+            const layouts = new Set(this.layouts.map((item) => item.id));
+            const styles = new Set(this.diagonalStyles.map((item) => item.id));
+            const backgrounds = new Set(this.backgroundOptions.map((item) => item.id));
+
+            if (layouts.has(settings.layout)) {
+                this.layout = settings.layout;
+            }
+            if (Number.isFinite(Number(settings.diagonalAngle))) {
+                this.diagonalAngle = Number(settings.diagonalAngle);
+            }
+            if (styles.has(settings.diagonalStyle)) {
+                this.diagonalStyle = settings.diagonalStyle;
+            }
+            if (Number.isFinite(Number(settings.diagonalDensity))) {
+                this.diagonalDensity = Math.min(100, Math.max(0.1, Number(settings.diagonalDensity)));
+            }
+            if (Number.isFinite(Number(settings.splitPosition))) {
+                this.splitPosition = Math.min(100, Math.max(0, Number(settings.splitPosition)));
+            }
+            this.swapSides = Boolean(settings.swapSides);
+            if (Number.isFinite(Number(settings.imagePadding))) {
+                this.imagePadding = Math.min(40, Math.max(0, Number(settings.imagePadding)));
+            }
+            if (Number.isFinite(Number(settings.imageRadius))) {
+                this.imageRadius = Math.min(50, Math.max(0, Number(settings.imageRadius)));
+            }
+            if (backgrounds.has(settings.backgroundType)) {
+                this.backgroundType = settings.backgroundType;
+            }
+            if (typeof settings.backgroundBg === 'string') {
+                this.backgroundBg = settings.backgroundBg;
+            }
+            if (typeof settings.backgroundFg === 'string') {
+                this.backgroundFg = settings.backgroundFg;
+            }
+            if (Number.isFinite(Number(settings.backgroundDensity))) {
+                this.backgroundDensity = Math.min(80, Math.max(8, Number(settings.backgroundDensity)));
+            }
+            if (['1', '1.5', '2'].includes(String(settings.exportScale))) {
+                this.exportScale = String(settings.exportScale);
+            }
+            if (typeof settings.exportPng === 'boolean') {
+                this.exportPng = settings.exportPng;
+            }
+            if (typeof settings.exportJpg === 'boolean') {
+                this.exportJpg = settings.exportJpg;
+            }
+            if (Number.isFinite(Number(settings.jpgQuality))) {
+                this.jpgQuality = Math.min(100, Math.max(50, Number(settings.jpgQuality)));
+            }
+
+            this.previewTool = this.layout === 'diagonal' ? 'angle' : 'position';
+        },
+
+        loadPresets() {
+            try {
+                const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+                const parsed = raw ? JSON.parse(raw) : [];
+                this.presets = Array.isArray(parsed)
+                    ? parsed.filter((item) => item && typeof item.id === 'string' && typeof item.name === 'string')
+                    : [];
+            } catch {
+                this.presets = [];
+            }
+        },
+
+        persistPresets() {
+            localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(this.presets));
+        },
+
+        openPresetModal() {
+            this.loadPresetModalOpen = false;
+            this.presetName = '';
+            this.presetModalOpen = true;
+            this.$nextTick(() => {
+                this.$refs.presetNameInput?.focus();
+            });
+        },
+
+        closePresetModal() {
+            this.presetModalOpen = false;
+            this.presetName = '';
+        },
+
+        openLoadPresetModal() {
+            this.presetModalOpen = false;
+            this.selectedLoadPresetId = this.activePresetId || this.presets[0]?.id || null;
+            this.loadPresetModalOpen = true;
+        },
+
+        closeLoadPresetModal() {
+            this.loadPresetModalOpen = false;
+            this.selectedLoadPresetId = null;
+        },
+
+        get selectedLoadPreset() {
+            return this.presets.find((item) => item.id === this.selectedLoadPresetId) || null;
+        },
+
+        presetSummary(preset) {
+            const settings = preset?.settings || {};
+            const parts = [];
+            if (settings.layout) {
+                parts.push(String(settings.layout));
+            }
+            if (settings.layout === 'diagonal' && settings.diagonalStyle) {
+                parts.push(String(settings.diagonalStyle));
+            }
+            if (Number.isFinite(Number(settings.splitPosition))) {
+                parts.push(`${Math.round(Number(settings.splitPosition))}%`);
+            }
+            if (Number(settings.imagePadding) > 0) {
+                parts.push(`pad ${Math.round(Number(settings.imagePadding))}%`);
+            }
+            if (Number(settings.imageRadius) > 0) {
+                parts.push(`radius ${Math.round(Number(settings.imageRadius))}%`);
+            }
+            if (settings.backgroundType) {
+                parts.push(String(settings.backgroundType));
+            }
+            return parts.join(' · ');
+        },
+
+        loadSelectedPreset() {
+            if (this.selectedLoadPreset) {
+                this.applyPreset(this.selectedLoadPreset);
+            }
+        },
+
+        savePreset() {
+            const name = this.presetName.trim();
+            if (!name) {
+                this.statusMessage = 'Enter a preset name.';
+                return;
+            }
+
+            const settings = this.captureSettings();
+            const existing = this.presets.find((item) => item.name.toLowerCase() === name.toLowerCase());
+
+            if (existing) {
+                existing.settings = settings;
+                existing.updatedAt = Date.now();
+                this.activePresetId = existing.id;
+                this.statusMessage = `Preset “${existing.name}” updated.`;
+            } else {
+                const preset = {
+                    id: crypto.randomUUID(),
+                    name,
+                    settings,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                };
+                this.presets.unshift(preset);
+                this.activePresetId = preset.id;
+                this.statusMessage = `Preset “${name}” saved.`;
+            }
+
+            this.persistPresets();
+            this.closePresetModal();
+        },
+
+        applyPreset(preset) {
+            if (!preset?.settings) {
+                return;
+            }
+            this.applySettings(preset.settings);
+            this.activePresetId = preset.id;
+            this.statusMessage = `Preset “${preset.name}” applied.`;
+            this.closeLoadPresetModal();
+        },
+
+        deletePreset(id) {
+            const preset = this.presets.find((item) => item.id === id);
+            if (!preset) {
+                return;
+            }
+            if (!window.confirm(`Delete preset “${preset.name}”?`)) {
+                return;
+            }
+
+            this.presets = this.presets.filter((item) => item.id !== id);
+            if (this.activePresetId === id) {
+                this.activePresetId = null;
+            }
+            if (this.selectedLoadPresetId === id) {
+                this.selectedLoadPresetId = this.presets[0]?.id || null;
+            }
+            this.persistPresets();
+            this.statusMessage = `Preset “${preset.name}” deleted.`;
+        },
+
+        async assignImage(file, slot) {
             if (!file || !file.type.startsWith('image/')) {
                 this.statusMessage = 'Choose a PNG, JPG, or WebP image.';
                 return;
@@ -249,22 +384,38 @@ document.addEventListener('alpine:init', () => {
             const image = await this.loadImage(url);
             const meta = `${image.naturalWidth} × ${image.naturalHeight}`;
 
-            if (side === 'light') {
-                if (this.lightImage?.src?.startsWith('blob:')) {
-                    URL.revokeObjectURL(this.lightImage.src);
+            if (slot === 'a') {
+                if (this.imageA?.src?.startsWith('blob:')) {
+                    URL.revokeObjectURL(this.imageA.src);
                 }
-                this.lightImage = image;
-                this.lightName = file.name;
-                this.lightMeta = meta;
+                this.imageA = image;
+                this.nameA = file.name;
+                this.metaA = meta;
             } else {
-                if (this.darkImage?.src?.startsWith('blob:')) {
-                    URL.revokeObjectURL(this.darkImage.src);
+                if (this.imageB?.src?.startsWith('blob:')) {
+                    URL.revokeObjectURL(this.imageB.src);
                 }
-                this.darkImage = image;
-                this.darkName = file.name;
-                this.darkMeta = meta;
+                this.imageB = image;
+                this.nameB = file.name;
+                this.metaB = meta;
+            }
+        },
+
+        async loadFiles(fileList) {
+            const files = [...fileList].filter((file) => file.type.startsWith('image/')).slice(0, 2);
+            if (!files.length) {
+                this.statusMessage = 'Drop two PNG, JPG, or WebP images.';
+                return;
             }
 
+            if (files.length === 1) {
+                this.statusMessage = 'Drop two images at once.';
+                return;
+            }
+
+            await this.assignImage(files[0], 'a');
+            await this.assignImage(files[1], 'b');
+            this.statusMessage = '';
             this.syncBaseSize();
             this.render();
         },
@@ -278,65 +429,73 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
-        onFileInput(event, side) {
-            const file = event.target.files?.[0];
-            if (file) {
-                this.loadFile(file, side);
+        onFileInput(event) {
+            const files = event.target.files;
+            if (files?.length) {
+                this.loadFiles(files);
             }
             event.target.value = '';
         },
 
-        onDrop(event, side) {
+        onDragOver(event) {
             event.preventDefault();
-            const file = event.dataTransfer?.files?.[0];
-            if (file) {
-                this.loadFile(file, side);
+            this.dropActive = true;
+        },
+
+        onDragLeave(event) {
+            if (event.currentTarget.contains(event.relatedTarget)) {
+                return;
+            }
+            this.dropActive = false;
+        },
+
+        onDrop(event) {
+            event.preventDefault();
+            this.dropActive = false;
+            const files = event.dataTransfer?.files;
+            if (files?.length) {
+                this.loadFiles(files);
             }
         },
 
-        clearSide(side) {
-            if (side === 'light') {
-                if (this.lightImage?.src?.startsWith('blob:')) {
-                    URL.revokeObjectURL(this.lightImage.src);
-                }
-                this.lightImage = null;
-                this.lightName = '';
-                this.lightMeta = '';
-            } else {
-                if (this.darkImage?.src?.startsWith('blob:')) {
-                    URL.revokeObjectURL(this.darkImage.src);
-                }
-                this.darkImage = null;
-                this.darkName = '';
-                this.darkMeta = '';
+        clearImages() {
+            if (this.imageA?.src?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.imageA.src);
             }
-            this.syncBaseSize();
+            if (this.imageB?.src?.startsWith('blob:')) {
+                URL.revokeObjectURL(this.imageB.src);
+            }
+            this.imageA = null;
+            this.imageB = null;
+            this.nameA = '';
+            this.nameB = '';
+            this.metaA = '';
+            this.metaB = '';
+            this.sizeWarning = '';
+            this.baseWidth = 1280;
+            this.baseHeight = 720;
             this.render();
         },
 
         syncBaseSize() {
             this.sizeWarning = '';
-            if (this.lightImage && this.darkImage) {
+            if (this.imageA && this.imageB) {
                 if (
-                    this.lightImage.naturalWidth !== this.darkImage.naturalWidth
-                    || this.lightImage.naturalHeight !== this.darkImage.naturalHeight
+                    this.imageA.naturalWidth !== this.imageB.naturalWidth
+                    || this.imageA.naturalHeight !== this.imageB.naturalHeight
                 ) {
-                    this.sizeWarning = 'Screenshots differ in size. Use cover or contain to fit.';
+                    this.sizeWarning = 'Image sizes differ.';
                 }
-                this.baseWidth = this.lightImage.naturalWidth;
-                this.baseHeight = this.lightImage.naturalHeight;
+                this.baseWidth = this.imageA.naturalWidth;
+                this.baseHeight = this.imageA.naturalHeight;
                 return;
             }
 
-            const image = this.lightImage || this.darkImage;
+            const image = this.imageA || this.imageB;
             if (image) {
                 this.baseWidth = image.naturalWidth;
                 this.baseHeight = image.naturalHeight;
             }
-        },
-
-        setRatio(value) {
-            this.splitPosition = value;
         },
 
         resolveExportSize() {
@@ -346,13 +505,6 @@ document.addEventListener('alpine:init', () => {
             width = Math.round(width * scale);
             height = Math.round(height * scale);
 
-            const maxWidth = Number(this.customMaxWidth);
-            if (maxWidth > 0 && width > maxWidth) {
-                const ratio = maxWidth / width;
-                width = maxWidth;
-                height = Math.round(height * ratio);
-            }
-
             return {
                 width: Math.max(1, width),
                 height: Math.max(1, height),
@@ -361,22 +513,22 @@ document.addEventListener('alpine:init', () => {
 
         buildOptions(width, height) {
             return {
-                lightImage: this.lightImage,
-                darkImage: this.darkImage,
+                lightImage: this.imageA,
+                darkImage: this.imageB,
                 width,
                 height,
-                layoutFamily: this.layoutFamily,
-                layoutVariant: this.layoutVariant,
+                layoutFamily: this.layout,
+                layoutVariant: this.layout === 'diagonal' ? this.diagonalStyle : 'hard',
                 splitPosition: this.splitPosition / 100,
-                softEdge: Number(this.softEdge) || 0,
+                softEdge: 0,
                 swapSides: this.swapSides,
-                flipDirection: this.flipDirection,
-                invertMask: this.invertMask,
-                maskDensity: Number(this.maskDensity) || 28,
-                fitMode: this.fitMode,
-                overlapOffsetX: Number(this.overlapOffsetX) || 0,
-                overlapOffsetY: Number(this.overlapOffsetY) || 0,
-                overlapShadow: Number(this.overlapShadow) || 0,
+                flipDirection: false,
+                invertMask: false,
+                maskDensity: this.diagonalDensity,
+                fitMode: 'cover',
+                diagonalAngle: this.diagonalAngle,
+                imagePadding: this.imagePadding,
+                imageRadius: this.imageRadius,
                 background: {
                     type: this.backgroundType,
                     bg: this.backgroundBg,
@@ -391,7 +543,6 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            // Render at full upload resolution, display scaled to fit the app pane
             this.compositor.render(this.buildOptions(this.baseWidth, this.baseHeight));
 
             const preview = this.$refs.previewCanvas;
@@ -414,6 +565,17 @@ document.addEventListener('alpine:init', () => {
             return { width: rect.width, height: rect.height };
         },
 
+        contentFrame(displayWidth, displayHeight, paddingPercent = this.imagePadding) {
+            const pad = Math.min(displayWidth, displayHeight) * (clamp(Number(paddingPercent) || 0, 0, 40) / 100);
+            return {
+                pad,
+                x: pad,
+                y: pad,
+                width: Math.max(1, displayWidth - pad * 2),
+                height: Math.max(1, displayHeight - pad * 2),
+            };
+        },
+
         updateHandle() {
             const handle = this.$refs.splitHandle;
             const guide = this.compositor?.getSplitGuide(this.buildOptions(this.baseWidth, this.baseHeight));
@@ -429,34 +591,47 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            const content = this.contentFrame(displayWidth, displayHeight, guide.padding ?? this.imagePadding);
+
             handle.style.display = 'block';
+            handle.style.border = 'none';
+            handle.style.background = 'transparent';
+
+            if (guide.axis === 'diagonal') {
+                const span = Math.hypot(content.width, content.height);
+                const radians = (guide.angle * Math.PI) / 180;
+                const nx = -Math.sin(radians);
+                const ny = Math.cos(radians);
+                const offset = (guide.position - 0.5) * Math.hypot(content.width, content.height);
+                const cx = content.x + content.width / 2 + nx * offset;
+                const cy = content.y + content.height / 2 + ny * offset;
+
+                handle.style.left = `${cx}px`;
+                handle.style.top = `${cy}px`;
+                handle.style.width = `${span}px`;
+                handle.style.height = '16px';
+                handle.style.transform = `translate(-50%, -50%) rotate(${guide.angle}deg)`;
+                handle.style.cursor = this.previewTool === 'angle' ? 'grab' : 'move';
+                handle.style.borderTop = '1px solid rgba(23,23,23,0.8)';
+                return;
+            }
 
             if (guide.axis === 'y') {
-                const y = guide.position * displayHeight;
-                handle.style.left = '0';
-                handle.style.top = `${y}px`;
-                handle.style.width = `${displayWidth}px`;
+                handle.style.left = `${content.x}px`;
+                handle.style.top = `${content.y + guide.position * content.height}px`;
+                handle.style.width = `${content.width}px`;
                 handle.style.height = '16px';
                 handle.style.transform = 'translate(0, -50%)';
                 handle.style.cursor = 'ns-resize';
-                handle.style.background = 'transparent';
                 handle.style.borderTop = '1px solid rgba(23,23,23,0.75)';
-                handle.style.borderBottom = 'none';
-                handle.style.borderLeft = 'none';
-                handle.style.borderRight = 'none';
             } else {
-                const x = guide.position * displayWidth;
-                handle.style.left = `${x}px`;
-                handle.style.top = '0';
+                handle.style.left = `${content.x + guide.position * content.width}px`;
+                handle.style.top = `${content.y}px`;
                 handle.style.width = '16px';
-                handle.style.height = `${displayHeight}px`;
+                handle.style.height = `${content.height}px`;
                 handle.style.transform = 'translate(-50%, 0)';
                 handle.style.cursor = 'ew-resize';
-                handle.style.background = 'transparent';
                 handle.style.borderLeft = '1px solid rgba(23,23,23,0.75)';
-                handle.style.borderRight = 'none';
-                handle.style.borderTop = 'none';
-                handle.style.borderBottom = 'none';
             }
         },
 
@@ -466,11 +641,29 @@ document.addEventListener('alpine:init', () => {
             }
             event.preventDefault();
             this.dragging = true;
+            this.dragPivot = null;
+
+            const canvas = this.$refs.previewCanvas;
+            const guide = this.compositor?.getSplitGuide(this.buildOptions(this.baseWidth, this.baseHeight));
+            if (canvas && guide?.axis === 'diagonal' && this.previewTool === 'angle') {
+                const rect = canvas.getBoundingClientRect();
+                const content = this.contentFrame(rect.width, rect.height, guide.padding ?? this.imagePadding);
+                const radians = (guide.angle * Math.PI) / 180;
+                const nx = -Math.sin(radians);
+                const ny = Math.cos(radians);
+                const offset = (guide.position - 0.5) * Math.hypot(content.width, content.height);
+                this.dragPivot = {
+                    x: content.x + content.width / 2 + nx * offset,
+                    y: content.y + content.height / 2 + ny * offset,
+                };
+            }
+
             this.onDrag(event);
 
             const move = (e) => this.onDrag(e);
             const up = () => {
                 this.dragging = false;
+                this.dragPivot = null;
                 window.removeEventListener('pointermove', move);
                 window.removeEventListener('pointerup', up);
             };
@@ -495,12 +688,46 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            const content = this.contentFrame(rect.width, rect.height, guide.padding ?? this.imagePadding);
+            const cx = rect.left + content.x + content.width / 2;
+            const cy = rect.top + content.y + content.height / 2;
+
+            if (guide.axis === 'diagonal') {
+                if (this.previewTool === 'angle') {
+                    const angle = (Math.atan2(event.clientY - cy, event.clientX - cx) * 180) / Math.PI;
+                    this.diagonalAngle = Math.round(angle * 10) / 10;
+
+                    // Keep the line through the grab point so rotation doesn't slide it.
+                    if (this.dragPivot) {
+                        const radians = (this.diagonalAngle * Math.PI) / 180;
+                        const nx = -Math.sin(radians);
+                        const ny = Math.cos(radians);
+                        const offset =
+                            (this.dragPivot.x - (content.x + content.width / 2)) * nx
+                            + (this.dragPivot.y - (content.y + content.height / 2)) * ny;
+                        const split = clamp(0.5 + offset / Math.hypot(content.width, content.height), 0, 1);
+                        this.splitPosition = Math.round(split * 1000) / 10;
+                    }
+                    return;
+                }
+
+                const radians = (this.diagonalAngle * Math.PI) / 180;
+                const nx = -Math.sin(radians);
+                const ny = Math.cos(radians);
+                const offset = (event.clientX - cx) * nx + (event.clientY - cy) * ny;
+                const split = clamp(0.5 + offset / Math.hypot(content.width, content.height), 0, 1);
+                this.splitPosition = Math.round(split * 1000) / 10;
+                return;
+            }
+
             if (guide.axis === 'y') {
-                const y = (event.clientY - rect.top) / rect.height;
-                this.splitPosition = Math.round(clamp(y, 0, 1) * 100);
+                this.splitPosition = Math.round(
+                    clamp((event.clientY - rect.top - content.y) / content.height, 0, 1) * 1000,
+                ) / 10;
             } else {
-                const x = (event.clientX - rect.left) / rect.width;
-                this.splitPosition = Math.round(clamp(x, 0, 1) * 100);
+                this.splitPosition = Math.round(
+                    clamp((event.clientX - rect.left - content.x) / content.width, 0, 1) * 1000,
+                ) / 10;
             }
         },
 
@@ -522,7 +749,7 @@ document.addEventListener('alpine:init', () => {
                     jobs.push({
                         mime: 'image/png',
                         quality: undefined,
-                        name: `thumbnail-${width}x${height}-${stamp}.png`,
+                        name: `pairframe-${width}x${height}-${stamp}.png`,
                     });
                 }
 
@@ -530,7 +757,7 @@ document.addEventListener('alpine:init', () => {
                     jobs.push({
                         mime: 'image/jpeg',
                         quality: clamp(this.jpgQuality / 100, 0.1, 1),
-                        name: `thumbnail-${width}x${height}-${stamp}.jpg`,
+                        name: `pairframe-${width}x${height}-${stamp}.jpg`,
                     });
                 }
 
