@@ -15,7 +15,7 @@ Prebuilt macOS and Windows installers are available on the [GitHub Releases](htt
 3. Scroll to the blocked-app message and choose **Open Anyway** / **Allow**.
 4. Confirm again if macOS asks.
 
-Alternatively, skip the release binaries and [build or run the app yourself locally](#run-as-desktop-app) — that does not require changing privacy settings for a downloaded installer.
+Alternatively, skip the release binaries and [build the app yourself locally](#build-locally) — that does not require changing privacy settings for a downloaded installer.
 
 ## Requirements
 
@@ -55,6 +55,27 @@ For a live Vite + NativePHP loop:
 ```bash
 composer native:dev
 ```
+
+## Build locally
+
+After [Setup](#setup), create an installer for your machine:
+
+```bash
+npm run build
+php artisan native:build
+```
+
+Build for a specific OS / architecture (when supported on your host):
+
+```bash
+php artisan native:build mac arm64
+php artisan native:build mac x64
+php artisan native:build win x64
+```
+
+Installers land in `nativephp/electron/dist/` (for example `.dmg` / `.zip` on macOS, `.exe` on Windows).
+
+Local builds are also unsigned unless you configure Apple / Windows code signing. Prefer `php artisan native:run` for day-to-day development.
 
 ## Features
 
