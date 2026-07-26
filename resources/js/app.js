@@ -195,10 +195,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         async loadVideoExport() {
-            if (!this._videoExportModule) {
-                this._videoExportModule = import('./video-export.js');
+            try {
+                if (!this._videoExportModule) {
+                    this._videoExportModule = import('./video-export.js');
+                }
+                return await this._videoExportModule;
+            } catch (error) {
+                this._videoExportModule = null;
+                throw error;
             }
-            return this._videoExportModule;
         },
 
         setTheme(theme) {
