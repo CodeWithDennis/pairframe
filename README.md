@@ -4,6 +4,8 @@ NativePHP desktop app to compose two screenshots into split thumbnails with back
 
 ![Pairframe composing a diagonal wavy split thumbnail](docs/pairframe.png)
 
+**Heads up: this project is AI-assisted.** A lot of the code and docs were written with AI tools (reviewed and steered by me). Pairframe exists first for my own thumbnail workflow; I open-sourced it in case it helps someone else. Issues and pull requests are welcome, just know what you're looking at.
+
 ## Downloads
 
 Prebuilt macOS and Windows installers are on the [GitHub Releases](https://github.com/CodeWithDennis/pairframe/releases) page.
