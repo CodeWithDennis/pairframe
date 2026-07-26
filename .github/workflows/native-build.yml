@@ -17,19 +17,16 @@ jobs:
   build:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # mac "all" builds arm64 + x64 in one electron-builder run so latest-mac.yml lists both.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
             platform: mac
-            arch: arm64
-            label: macOS Apple Silicon
-          - os: macos-latest
-            platform: mac
-            arch: x64
-            label: macOS Intel
+            arch: all
+            label: macOS (arm64 + x64)
           - os: windows-latest
             platform: win
             arch: x64
