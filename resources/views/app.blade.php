@@ -258,9 +258,51 @@
                         </div>
                         <input type="range" min="-180" max="180" step="0.5" class="w-full" x-model.number="diagonalAngle">
                     </div>
+
+                    <div class="mt-3" x-show="layout === 'overlap'" x-cloak>
+                        <p class="mb-2 text-xs font-medium text-lumis-ink">Style</p>
+                        <div class="mb-3 flex flex-wrap gap-1.5">
+                            <template x-for="option in overlapVariants" :key="option.id">
+                                <button
+                                    type="button"
+                                    class="px-2.5 py-1.5 text-xs font-medium"
+                                    :class="segmentClass(overlapVariant === option.id)"
+                                    @click="overlapVariant = option.id"
+                                    x-text="option.label"
+                                ></button>
+                            </template>
+                        </div>
+                        <div class="mb-3 flex flex-wrap gap-1.5">
+                            <button
+                                type="button"
+                                class="px-2.5 py-1.5 text-xs font-medium"
+                                :class="segmentClass(overlapShadow)"
+                                @click="overlapShadow = !overlapShadow"
+                            >Shadow</button>
+                        </div>
+                        <div x-show="showsOverlapOffset" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Offset</label>
+                                <div class="flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="40"
+                                        step="1"
+                                        class="slider-value"
+                                        x-model.number="overlapOffset"
+                                        @blur="clampSlider('overlapOffset', 0, 40)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            <input type="range" min="0" max="40" step="1" class="w-full" x-model.number="overlapOffset">
+                        </div>
+                    </div>
                 </section>
 
-                <section>
+                <section x-show="usesSplit" x-cloak>
                     <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Split</h2>
                     <div class="mb-1 flex items-center justify-between gap-2">
                         <label class="text-xs font-medium text-lumis-ink">Position</label>
@@ -286,7 +328,7 @@
                     <div class="mb-3 flex flex-wrap gap-1.5">
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(swapSides)" @click="swapSides = !swapSides">Swap sides</button>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-3" x-show="usesSplit" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Padding</label>
                             <div class="flex items-center text-xs text-zinc-400">
@@ -430,17 +472,26 @@
                     <div class="flex items-center gap-3">
                         <span
                             class="text-xs text-zinc-400"
-                            x-show="hasBothImages"
+                            x-show="hasBothImages && !videoPreviewing"
                             x-cloak
-                            x-text="previewSizeLabel + (layout === 'diagonal' ? (previewTool === 'angle' ? ' · drag to rotate' : ' · drag to move') : ' · drag to fine-tune')"
+                            x-text="previewSizeLabel + (layout === 'overlap' ? '' : (layout === 'diagonal' ? (previewTool === 'angle' ? ' · drag to rotate' : ' · drag to move') : ' · drag to fine-tune'))"
                         ></span>
+                        <span class="text-xs text-zinc-400" x-show="videoPreviewing" x-cloak>Playing wipe preview</span>
                         <span class="text-xs text-lumis-status-uploading" x-show="sizeWarning" x-text="sizeWarning" x-cloak></span>
+                        <button
+                            type="button"
+                            class="text-xs font-medium text-zinc-400 hover:text-lumis-ink"
+                            x-show="canPreviewVideo"
+                            x-cloak
+                            @click="toggleVideoPreview()"
+                            x-text="videoPreviewing ? 'Stop preview' : 'Play preview'"
+                        ></button>
                         <button
                             type="button"
                             class="text-xs font-medium text-zinc-400 hover:text-lumis-ink"
                             x-show="hasBothImages"
                             x-cloak
-                            @click="clearImages()"
+                            @click="stopVideoPreview(); clearImages()"
                         >
                             Replace images
                         </button>
@@ -539,20 +590,29 @@
                         <span class="text-xs text-zinc-400" x-text="exportSizeLabel"></span>
                     </div>
 
-                    <p class="mb-2 text-xs font-medium text-lumis-ink">Scale</p>
-                    <div class="mb-3 flex flex-wrap gap-1.5">
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '1')" @click="exportScale = '1'">1×</button>
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '1.5')" @click="exportScale = '1.5'">1.5×</button>
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '2')" @click="exportScale = '2'">2×</button>
+                    <div class="mb-3" x-show="exportFormat !== 'video'" x-cloak>
+                        <p class="mb-2 text-xs font-medium text-lumis-ink">Scale</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '1')" @click="exportScale = '1'">1×</button>
+                            <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '1.5')" @click="exportScale = '1.5'">1.5×</button>
+                            <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '2')" @click="exportScale = '2'">2×</button>
+                        </div>
                     </div>
 
-                    <p class="mb-2 text-xs font-medium text-lumis-ink">Formats</p>
+                    <p class="mb-2 text-xs font-medium text-lumis-ink">Format</p>
                     <div class="mb-3 flex flex-wrap gap-1.5">
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportPng)" @click="exportPng = !exportPng">PNG</button>
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportJpg)" @click="exportJpg = !exportJpg">JPG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'png')" @click="stopVideoPreview(); exportFormat = 'png'">PNG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'jpg')" @click="stopVideoPreview(); exportFormat = 'jpg'">JPG</button>
+                        <button
+                            type="button"
+                            class="px-2.5 py-1.5 text-xs font-medium"
+                            :class="segmentClass(exportFormat === 'video')"
+                            :title="usesSplit ? 'Wipe animation at source resolution' : 'Video needs a split layout'"
+                            @click="exportFormat = 'video'"
+                        >Video</button>
                     </div>
 
-                    <div x-show="exportJpg" x-cloak>
+                    <div x-show="exportFormat === 'jpg'" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">JPG quality</label>
                             <div class="flex items-center text-xs text-zinc-400">
@@ -570,6 +630,75 @@
                             </div>
                         </div>
                         <input type="range" min="50" max="100" step="1" class="w-full" x-model.number="jpgQuality">
+                    </div>
+
+                    <div class="mt-3 space-y-3" x-show="exportFormat === 'video'" x-cloak>
+                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak>Wipe animation · source resolution</p>
+                        <p class="text-xs text-lumis-status-uploading" x-show="!usesSplit" x-cloak>Switch to Vertical, Horizontal, or Diagonal for video.</p>
+                        <div x-show="usesSplit" x-cloak>
+                            <p class="mb-1.5 text-xs font-medium text-lumis-ink">Container</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in videoContainerOptions" :key="option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
+                                        :class="segmentClass(videoContainer === option.id)"
+                                        :disabled="(option.id === 'mp4' && !supportsMp4Video) || (option.id === 'webm' && !supportsWebmVideo)"
+                                        :title="option.id === 'mp4' && !supportsMp4Video ? 'MP4 not supported here' : (option.id === 'webm' && !supportsWebmVideo ? 'WebM not supported here' : '')"
+                                        @click="videoContainer = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Duration</label>
+                                <div class="flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="6"
+                                        step="0.5"
+                                        class="slider-value"
+                                        x-model.number="videoDuration"
+                                        @blur="clampSlider('videoDuration', 1, 6)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>s</span>
+                                </div>
+                            </div>
+                            <input type="range" min="1" max="6" step="0.5" class="w-full" x-model.number="videoDuration">
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <p class="mb-1.5 text-xs font-medium text-lumis-ink">FPS</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in videoFpsOptions" :key="option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(videoFps === option.id)"
+                                        @click="videoFps = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <p class="mb-1.5 text-xs font-medium text-lumis-ink">Direction</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(!videoReverse)" @click="stopVideoPreview(); videoReverse = false">A → B</button>
+                                <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(videoReverse)" @click="stopVideoPreview(); videoReverse = true">B → A</button>
+                            </div>
+                        </div>
+                        <div x-show="canPreviewVideo || videoPreviewing" x-cloak>
+                            <button
+                                type="button"
+                                class="inline-flex h-8 w-full items-center justify-center border border-lumis-panel-line bg-lumis-panel-surface text-[13px] font-medium text-lumis-ink hover:bg-lumis-segment-idle"
+                                @click="toggleVideoPreview()"
+                                x-text="videoPreviewing ? 'Stop preview' : 'Play preview'"
+                            ></button>
+                        </div>
                     </div>
                 </section>
             </aside>

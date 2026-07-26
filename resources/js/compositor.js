@@ -74,91 +74,90 @@ export function createCompositor() {
         paintBackground(ctx, width, height, options.background);
 
         const variant = options.layoutVariant || 'cards';
-        const offsetX = ((Number(options.overlapOffsetX) || 12) / 100) * width * 0.25;
-        const offsetY = ((Number(options.overlapOffsetY) || 10) / 100) * height * 0.25;
-        const shadowBlur = Number(options.overlapShadow) || 28;
+        const offsetXRaw = Number(options.overlapOffsetX);
+        const offsetYRaw = Number(options.overlapOffsetY);
+        const offsetX = ((Number.isFinite(offsetXRaw) ? offsetXRaw : 12) / 100) * width * 0.25;
+        const offsetY = ((Number.isFinite(offsetYRaw) ? offsetYRaw : 10) / 100) * height * 0.25;
+        const shadowBlur = Number.isFinite(Number(options.overlapShadow))
+            ? Math.max(0, Number(options.overlapShadow))
+            : 28;
         const flip = Boolean(options.flipDirection);
+        const radiusPct = clamp(Number(options.imageRadius) || 0, 0, 50) / 100;
 
-        const drawCard = (image, x, y, w, h, withChrome = true) => {
+        const sizeCard = (image, maxW, maxH) => {
+            const iw = Math.max(1, image?.naturalWidth || image?.width || maxW);
+            const ih = Math.max(1, image?.naturalHeight || image?.height || maxH);
+            const scale = Math.min(maxW / iw, maxH / ih);
+            return {
+                w: Math.max(1, Math.round(iw * scale)),
+                h: Math.max(1, Math.round(ih * scale)),
+            };
+        };
+
+        const drawCard = (image, x, y, w, h) => {
+            const radius = Math.min(w, h) * radiusPct;
             ctx.save();
-            ctx.shadowColor = 'rgba(23, 23, 23, 0.28)';
-            ctx.shadowBlur = shadowBlur;
-            ctx.shadowOffsetY = shadowBlur * 0.25;
-            ctx.fillStyle = '#ffffff';
-            roundRectPath(ctx, x, y, w, h, 0);
-            ctx.fill();
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-
-            let contentY = y;
-            let contentH = h;
-            if (withChrome) {
-                ctx.fillStyle = '#F5F5F5';
-                ctx.fillRect(x, y, w, 22);
-                ctx.fillStyle = '#EBEBEB';
-                ctx.fillRect(x, y + 22, w, 1);
-                ctx.fillStyle = '#D4D4D4';
-                ctx.beginPath();
-                ctx.arc(x + 12, y + 11, 4, 0, Math.PI * 2);
-                ctx.arc(x + 24, y + 11, 4, 0, Math.PI * 2);
-                ctx.arc(x + 36, y + 11, 4, 0, Math.PI * 2);
-                ctx.fill();
-                contentY = y + 23;
-                contentH = h - 23;
+            if (shadowBlur > 0) {
+                ctx.shadowColor = 'rgba(23, 23, 23, 0.28)';
+                ctx.shadowBlur = shadowBlur;
+                ctx.shadowOffsetY = shadowBlur * 0.25;
             }
 
-            const inset = 1;
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(x + inset, contentY, w - inset * 2, contentH - inset);
-            ctx.clip();
-            drawImageFitted(ctx, image, x + inset, contentY, w - inset * 2, contentH - inset, options.fitMode || 'cover');
-            ctx.restore();
+            if (radius > 0) {
+                sideCanvas.width = Math.max(1, Math.ceil(w));
+                sideCanvas.height = Math.max(1, Math.ceil(h));
+                sideCtx.clearRect(0, 0, sideCanvas.width, sideCanvas.height);
+                drawImageFitted(sideCtx, image, 0, 0, w, h, 'cover');
+                sideCtx.globalCompositeOperation = 'destination-in';
+                sideCtx.fillStyle = '#000000';
+                roundRectPath(sideCtx, 0, 0, w, h, radius);
+                sideCtx.fill();
+                sideCtx.globalCompositeOperation = 'source-over';
+                ctx.drawImage(sideCanvas, x, y);
+            } else {
+                drawImageFitted(ctx, image, x, y, w, h, 'cover');
+            }
 
-            ctx.strokeStyle = '#EBEBEB';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
             ctx.restore();
         };
 
         if (variant === 'side') {
             const gap = Math.max(16, width * 0.02);
             const pad = Math.min(width, height) * 0.06;
-            const cardW = (width - pad * 2 - gap) / 2;
-            const cardH = height - pad * 2;
+            const maxW = (width - pad * 2 - gap) / 2;
+            const maxH = height - pad * 2;
             const first = flip ? sideB : sideA;
             const second = flip ? sideA : sideB;
-            drawCard(first, pad, pad, cardW, cardH);
-            drawCard(second, pad + cardW + gap, pad, cardW, cardH);
+            const a = sizeCard(first, maxW, maxH);
+            const b = sizeCard(second, maxW, maxH);
+            drawCard(first, pad + (maxW - a.w) / 2, pad + (maxH - a.h) / 2, a.w, a.h);
+            drawCard(second, pad + maxW + gap + (maxW - b.w) / 2, pad + (maxH - b.h) / 2, b.w, b.h);
             return;
         }
 
         if (variant === 'stack') {
-            const pad = Math.min(width, height) * 0.1;
-            const cardW = width - pad * 2;
-            const cardH = height - pad * 2;
+            const pad = Math.min(width, height) * 0.08;
+            const maxW = width - pad * 2 - Math.abs(offsetX);
+            const maxH = height - pad * 2 - Math.abs(offsetY);
             const back = flip ? sideA : sideB;
             const front = flip ? sideB : sideA;
-            drawCard(back, pad + offsetX, pad + offsetY, cardW * 0.92, cardH * 0.92, false);
-            drawCard(front, pad, pad, cardW * 0.92, cardH * 0.92);
+            const sized = sizeCard(front || back, maxW, maxH);
+            const x = pad + (maxW - sized.w) / 2;
+            const y = pad + (maxH - sized.h) / 2;
+            drawCard(back, x + offsetX, y + offsetY, sized.w, sized.h);
+            drawCard(front, x, y, sized.w, sized.h);
             return;
         }
 
-        const pad = Math.min(width, height) * 0.08;
-        const cardW = width * 0.58;
-        const cardH = height * 0.7;
-        const ax = pad;
-        const ay = pad + offsetY * 0.3;
-        const bx = width - pad - cardW;
-        const by = height - pad - cardH;
-
-        if (flip) {
-            drawCard(sideB, ax + offsetX * 0.2, ay, cardW, cardH);
-            drawCard(sideA, bx - offsetX, by - offsetY, cardW, cardH);
-        } else {
-            drawCard(sideA, ax, ay, cardW, cardH);
-            drawCard(sideB, bx - offsetX * 0.15, by - offsetY * 0.15, cardW, cardH);
-        }
+        const pad = Math.min(width, height) * 0.06;
+        const maxW = width * 0.62;
+        const maxH = height * 0.72;
+        const first = flip ? sideB : sideA;
+        const second = flip ? sideA : sideB;
+        const a = sizeCard(first, maxW, maxH);
+        const b = sizeCard(second, maxW, maxH);
+        drawCard(first, pad, pad + offsetY * 0.15, a.w, a.h);
+        drawCard(second, width - pad - b.w, height - pad - b.h, b.w, b.h);
     }
 
     function contentPadding(width, height, options) {
