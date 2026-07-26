@@ -1,0 +1,121 @@
+@import 'tailwindcss';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+    --font-sans:
+        'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+    --font-display:
+        'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+    --font-serif:
+        'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --color-lumis-canvas: #fafafa;
+    --color-lumis-ink: #171717;
+    --color-lumis-display: #171717;
+    --color-lumis-icon: #8a8a8a;
+    --color-lumis-panel-surface: #ffffff;
+    --color-lumis-panel-line: #ebebeb;
+    --color-lumis-panel-header: #ffffff;
+    --color-lumis-segment-idle: #f5f5f5;
+    --color-lumis-control-bg: #ffffff;
+    --color-lumis-control-fg: #171717;
+    --color-lumis-status-uploading: #b99000;
+    --color-lumis-status-uploading-bg: #fcf9e8;
+    --color-lumis-status-uploaded: #449f80;
+    --color-lumis-status-uploaded-bg: #eef9f5;
+    --color-lumis-progress: #be9005;
+    --color-lumis-progress-track: #fef8e8;
+
+    --color-zinc-50: #fafafa;
+    --color-zinc-100: #f5f5f5;
+    --color-zinc-200: #e5e5e5;
+    --color-zinc-300: #d4d4d4;
+    --color-zinc-400: #a3a3a3;
+    --color-zinc-500: #737373;
+    --color-zinc-600: #525252;
+    --color-zinc-700: #404040;
+    --color-zinc-800: #262626;
+    --color-zinc-900: #171717;
+    --color-zinc-950: #0a0a0a;
+}
+
+@layer theme {
+    .dark {
+        --color-lumis-canvas: #0c0c0b;
+        --color-lumis-panel-surface: #121111;
+        --color-lumis-panel-header: #1a1817;
+        --color-lumis-panel-line: #32302e;
+        --color-lumis-control-bg: #1a1817;
+        --color-lumis-control-fg: #f3f2f0;
+        --color-lumis-segment-idle: #252422;
+        --color-lumis-status-uploading: #d4a82a;
+        --color-lumis-status-uploading-bg: #2a2410;
+        --color-lumis-status-uploaded: #6fc4a6;
+        --color-lumis-status-uploaded-bg: #14241f;
+        --color-lumis-progress: #d4a82a;
+        --color-lumis-progress-track: #2a2410;
+    }
+}
+
+@layer base {
+    html {
+        font-size: 110%;
+    }
+
+    body {
+        font-family: var(--font-sans);
+        font-feature-settings: 'liga' 1, 'calt' 1;
+        font-synthesis: none;
+        color: var(--color-lumis-ink);
+        background: var(--color-lumis-canvas);
+    }
+
+    * {
+        border-radius: 0;
+    }
+
+    input[type='range'] {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 6px;
+        background: var(--color-lumis-progress-track);
+        outline: none;
+    }
+
+    input[type='range']::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        background: var(--color-lumis-ink);
+        cursor: pointer;
+        border: 0;
+    }
+
+    input[type='color'] {
+        -webkit-appearance: none;
+        appearance: none;
+        padding: 0;
+        border: 1px solid var(--color-lumis-panel-line);
+        background: transparent;
+        width: 32px;
+        height: 32px;
+        cursor: pointer;
+    }
+
+    input[type='color']::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+
+    input[type='color']::-webkit-color-swatch {
+        border: none;
+    }
+}
