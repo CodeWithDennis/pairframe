@@ -36,7 +36,18 @@ jobs:
             label: Windows x64
 
     env:
-      NATIVEPHP_UPDATER_ENABLED: false
+      # Bake GitHub Releases updater into production builds (electron-builder publish config).
+      NATIVEPHP_UPDATER_ENABLED: true
+      NATIVEPHP_UPDATER_PROVIDER: github
+      GITHUB_OWNER: CodeWithDennis
+      GITHUB_REPO: pairframe
+      GITHUB_PRIVATE: false
+      GITHUB_V_PREFIXED_TAG_NAME: true
+      GITHUB_CHANNEL: latest
+      GITHUB_RELEASE_TYPE: release
+      # Do not set GITHUB_TOKEN / GH_TOKEN here: builds use native:build (not --publish).
+      # A write token in the build env risks ending up in updater/publish metadata.
+      # Unsigned CI builds until Apple / Windows signing secrets are configured.
       CSC_IDENTITY_AUTO_DISCOVERY: false
 
     steps:
@@ -76,7 +87,18 @@ jobs:
             VERSION="0.0.0-dev"
           fi
 
-          echo "NATIVEPHP_APP_VERSION=${VERSION}" >> .env
+          {
+            echo "NATIVEPHP_APP_VERSION=${VERSION}"
+            echo "NATIVEPHP_UPDATER_ENABLED=true"
+            echo "NATIVEPHP_UPDATER_PROVIDER=github"
+            echo "GITHUB_OWNER=CodeWithDennis"
+            echo "GITHUB_REPO=pairframe"
+            echo "GITHUB_PRIVATE=false"
+            echo "GITHUB_V_PREFIXED_TAG_NAME=true"
+            echo "GITHUB_CHANNEL=latest"
+            echo "GITHUB_RELEASE_TYPE=release"
+          } >> .env
+
           echo "Building Pairframe ${VERSION} for ${{ matrix.platform }}-${{ matrix.arch }}"
 
       # Do not use --publish: NativePHP's electronPath($subpath) resolves published
@@ -108,6 +130,22 @@ jobs:
       - name: List build output
         shell: bash
         run: ls -lah nativephp/electron/dist/ || true
+
+      - name: Scan artifacts for leaked GitHub tokens
+        shell: bash
+        run: |
+          if [ ! -d nativephp/electron/dist ]; then
+            echo "No dist directory; skipping token scan."
+            exit 0
+          fi
+
+          # Fail if common GitHub token prefixes appear in packaged output / update metadata.
+          if grep -R -a -E -e 'ghp_[A-Za-z0-9]{20,}' -e 'gho_[A-Za-z0-9]{20,}' -e 'ghu_[A-Za-z0-9]{20,}' -e 'ghs_[A-Za-z0-9]{20,}' -e 'ghr_[A-Za-z0-9]{20,}' -e 'github_pat_[A-Za-z0-9_]{20,}' nativephp/electron/dist/; then
+            echo "::error::Possible GitHub token found in build artifacts."
+            exit 1
+          fi
+
+          echo "No GitHub token patterns found in dist/."
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
