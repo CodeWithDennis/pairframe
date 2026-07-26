@@ -92,7 +92,12 @@ export function paintBackground(ctx, width, height, options = {}) {
         }
         ctx.stroke();
     } else if (type === 'noise') {
-        const image = ctx.createImageData(width, height);
+        const tileSize = 128;
+        const tile = document.createElement('canvas');
+        tile.width = tileSize;
+        tile.height = tileSize;
+        const tctx = tile.getContext('2d');
+        const image = tctx.createImageData(tileSize, tileSize);
         const data = image.data;
         const bgRgb = hexToRgb(bg) || { r: 250, g: 250, b: 250 };
         const fgRgb = hexToRgb(fg) || { r: 229, g: 229, b: 229 };
@@ -104,7 +109,12 @@ export function paintBackground(ctx, width, height, options = {}) {
             data[i + 2] = Math.round(bgRgb.b * (1 - t) + fgRgb.b * t);
             data[i + 3] = 255;
         }
-        ctx.putImageData(image, 0, 0);
+        tctx.putImageData(image, 0, 0);
+        const pattern = ctx.createPattern(tile, 'repeat');
+        if (pattern) {
+            ctx.fillStyle = pattern;
+            ctx.fillRect(0, 0, width, height);
+        }
     }
 
     ctx.restore();

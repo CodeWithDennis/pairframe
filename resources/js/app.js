@@ -88,6 +88,8 @@ document.addEventListener('alpine:init', () => {
         dropActive: false,
         previewMetrics: { scale: 1, drawWidth: 0, drawHeight: 0 },
         compositor: null,
+        _renderRaf: 0,
+        _videoExportModule: null,
 
         layouts: [
             { id: 'vertical', label: 'Vertical' },
@@ -167,13 +169,36 @@ document.addEventListener('alpine:init', () => {
                     if (this.exporting || this.videoPreviewing) {
                         return;
                     }
-                    this.render();
+                    this.scheduleRender();
                 },
             );
 
-            this.$nextTick(() => this.render());
+            this.$nextTick(() => this.scheduleRender());
             this._onResize = () => this.updateHandle();
             window.addEventListener('resize', this._onResize);
+        },
+
+        scheduleRender() {
+            if (this.exporting || this.videoPreviewing) {
+                return;
+            }
+            if (this._renderRaf) {
+                return;
+            }
+            this._renderRaf = requestAnimationFrame(() => {
+                this._renderRaf = 0;
+                if (this.exporting || this.videoPreviewing) {
+                    return;
+                }
+                this.render();
+            });
+        },
+
+        async loadVideoExport() {
+            if (!this._videoExportModule) {
+                this._videoExportModule = import('./video-export.js');
+            }
+            return this._videoExportModule;
         },
 
         setTheme(theme) {
@@ -757,29 +782,6 @@ document.addEventListener('alpine:init', () => {
             return types.find((type) => this.isVideoMimeSupported(type)) || '';
         },
 
-        pickVideoMimeType() {
-            const mp4Types = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4'];
-            const webmTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-
-            if (this.videoContainer === 'mp4') {
-                const mimeType = this.firstSupportedMime(mp4Types);
-                return mimeType ? { mimeType, extension: 'mp4', label: 'MP4' } : null;
-            }
-
-            if (this.videoContainer === 'webm') {
-                const mimeType = this.firstSupportedMime(webmTypes);
-                return mimeType ? { mimeType, extension: 'webm', label: 'WebM' } : null;
-            }
-
-            const mp4 = this.firstSupportedMime(mp4Types);
-            if (mp4) {
-                return { mimeType: mp4, extension: 'mp4', label: 'MP4' };
-            }
-
-            const webm = this.firstSupportedMime(webmTypes);
-            return webm ? { mimeType: webm, extension: 'webm', label: 'WebM' } : null;
-        },
-
         get supportsMp4Video() {
             return Boolean(this.firstSupportedMime(['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4']));
         },
@@ -788,79 +790,28 @@ document.addEventListener('alpine:init', () => {
             return Boolean(this.firstSupportedMime(['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']));
         },
 
+        selectExportFormat(format) {
+            this.exportFormat = format;
+            if (format === 'video') {
+                this.loadVideoExport();
+            }
+        },
+
         async recordWipeVideo(width, height) {
-            if (typeof MediaRecorder === 'undefined') {
-                throw new Error('MediaRecorder is not supported in this environment.');
-            }
-
-            const picked = this.pickVideoMimeType();
-            if (!picked) {
-                const wanted = this.videoContainer === 'auto' ? 'MP4/WebM' : this.videoContainer.toUpperCase();
-                throw new Error(`${wanted} video export is not supported in this environment.`);
-            }
-
-            const { mimeType, extension, label } = picked;
-            const fps = this.videoFps;
-            const durationSec = this.videoDuration;
-            const frameCount = Math.max(2, Math.round(fps * durationSec));
-            const frameDelay = 1000 / fps;
-
-            const renderFrame = (split01) => {
-                const options = this.buildOptions(width, height);
-                options.splitPosition = clamp(split01, 0, 1);
-                this.compositor.render(options);
-            };
-
-            renderFrame(this.videoReverse ? 1 : 0);
-
-            const canvas = this.compositor.getCanvas();
-            const stream = canvas.captureStream(fps);
-            const track = stream.getVideoTracks()[0];
-            if (!track) {
-                throw new Error('Could not capture a video track from the canvas.');
-            }
-
-            const bits = Math.round(Math.min(25_000_000, Math.max(6_000_000, width * height * 6)));
-            const recorder = new MediaRecorder(stream, {
-                mimeType,
-                videoBitsPerSecond: bits,
+            const { recordWipeVideo } = await this.loadVideoExport();
+            return recordWipeVideo({
+                width,
+                height,
+                videoContainer: this.videoContainer,
+                videoFps: this.videoFps,
+                videoDuration: this.videoDuration,
+                videoReverse: this.videoReverse,
+                compositor: this.compositor,
+                buildOptions: (w, h) => this.buildOptions(w, h),
+                onProgress: (message) => {
+                    this.statusMessage = message;
+                },
             });
-            const chunks = [];
-            recorder.ondataavailable = (event) => {
-                if (event.data?.size) {
-                    chunks.push(event.data);
-                }
-            };
-
-            const stopped = new Promise((resolve, reject) => {
-                recorder.onstop = () => resolve();
-                recorder.onerror = () => reject(recorder.error || new Error('Recording failed.'));
-            });
-
-            recorder.start(100);
-
-            for (let i = 0; i <= frameCount; i++) {
-                const t = i / frameCount;
-                const split = this.videoReverse ? 1 - t : t;
-                renderFrame(split);
-                if (typeof track.requestFrame === 'function') {
-                    track.requestFrame();
-                }
-                this.statusMessage = `Recording ${label}… ${Math.round((i / frameCount) * 100)}%`;
-                await wait(frameDelay);
-            }
-
-            await wait(Math.max(frameDelay * 2, 250));
-            recorder.stop();
-            await stopped;
-            stream.getTracks().forEach((item) => item.stop());
-
-            const blob = new Blob(chunks, { type: extension === 'mp4' ? 'video/mp4' : 'video/webm' });
-            if (!blob.size) {
-                throw new Error('Recording produced an empty file.');
-            }
-
-            return { blob, extension, label };
         },
 
         buildOptions(width, height) {
@@ -911,6 +862,11 @@ document.addEventListener('alpine:init', () => {
         render() {
             if (!this.compositor) {
                 return;
+            }
+
+            if (this._renderRaf) {
+                cancelAnimationFrame(this._renderRaf);
+                this._renderRaf = 0;
             }
 
             this.compositor.render(this.buildOptions(this.baseWidth, this.baseHeight));

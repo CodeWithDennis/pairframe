@@ -51,6 +51,23 @@ function roundRectPath(ctx, x, y, w, h, r = 0) {
     ctx.closePath();
 }
 
+function ensureCanvasSize(canvas, width, height) {
+    const w = Math.max(1, Math.round(width));
+    const h = Math.max(1, Math.round(height));
+    if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+        return true;
+    }
+    return false;
+}
+
+function clearCanvas(ctx, canvas, width, height) {
+    if (!ensureCanvasSize(canvas, width, height)) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
 export function createCompositor() {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: false });
@@ -58,8 +75,18 @@ export function createCompositor() {
     const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: false });
     const sideCanvas = document.createElement('canvas');
     const sideCtx = sideCanvas.getContext('2d', { willReadFrequently: false });
+    const bgCanvas = document.createElement('canvas');
+    const bgCtx = bgCanvas.getContext('2d', { willReadFrequently: false });
+    const sideACanvas = document.createElement('canvas');
+    const sideACtx = sideACanvas.getContext('2d', { willReadFrequently: false });
+    const sideBBaseCanvas = document.createElement('canvas');
+    const sideBBaseCtx = sideBBaseCanvas.getContext('2d', { willReadFrequently: false });
 
     let lastOptions = null;
+    let bgKey = '';
+    let sideAKey = '';
+    let sideBKey = '';
+    let maskKey = '';
 
     function resolveSides(options) {
         const light = options.lightImage;
@@ -70,8 +97,76 @@ export function createCompositor() {
         return { sideA: light, sideB: dark };
     }
 
+    function blitBackground(targetCtx, width, height, background) {
+        const bg = background || { type: 'solid', bg: '#FAFAFA' };
+        const key = [
+            width,
+            height,
+            bg.type || 'solid',
+            bg.bg || '',
+            bg.fg || '',
+            Number(bg.density) || 0,
+        ].join('|');
+
+        if (bgKey !== key) {
+            ensureCanvasSize(bgCanvas, width, height);
+            paintBackground(bgCtx, width, height, bg);
+            bgKey = key;
+        }
+
+        targetCtx.drawImage(bgCanvas, 0, 0);
+    }
+
+    function imageCacheKey(image, width, height, fitMode) {
+        if (!image) {
+            return `empty|${width}|${height}|${fitMode}`;
+        }
+        return [
+            image.src || '',
+            image.naturalWidth || image.width || 0,
+            image.naturalHeight || image.height || 0,
+            width,
+            height,
+            fitMode,
+        ].join('|');
+    }
+
+    function ensureFittedSide(cacheCanvas, cacheCtx, currentKey, image, width, height, fitMode) {
+        const key = imageCacheKey(image, width, height, fitMode);
+        if (currentKey === key && cacheCanvas.width === width && cacheCanvas.height === height) {
+            return currentKey;
+        }
+
+        clearCanvas(cacheCtx, cacheCanvas, width, height);
+        drawImageFitted(cacheCtx, image, 0, 0, width, height, fitMode);
+        return key;
+    }
+
+    function ensureMask(width, height, maskOptions) {
+        const key = [
+            width,
+            height,
+            maskOptions.layoutFamily || '',
+            maskOptions.layoutVariant || '',
+            Number(maskOptions.splitPosition) || 0,
+            Number(maskOptions.softEdge) || 0,
+            Boolean(maskOptions.flipDirection) ? 1 : 0,
+            Boolean(maskOptions.invertMask) ? 1 : 0,
+            Number(maskOptions.maskDensity) || 0,
+            Number(maskOptions.diagonalAngle) || 0,
+        ].join('|');
+
+        if (maskKey === key && maskCanvas.width === width && maskCanvas.height === height) {
+            return;
+        }
+
+        ensureCanvasSize(maskCanvas, width, height);
+        paintSplitMask(maskCtx, width, height, maskOptions);
+        maskKey = key;
+    }
+
     function renderOverlap(options, width, height, sideA, sideB) {
-        paintBackground(ctx, width, height, options.background);
+        blitBackground(ctx, width, height, options.background);
 
         const variant = options.layoutVariant || 'cards';
         const offsetXRaw = Number(options.overlapOffsetX);
@@ -104,9 +199,7 @@ export function createCompositor() {
             }
 
             if (radius > 0) {
-                sideCanvas.width = Math.max(1, Math.ceil(w));
-                sideCanvas.height = Math.max(1, Math.ceil(h));
-                sideCtx.clearRect(0, 0, sideCanvas.width, sideCanvas.height);
+                clearCanvas(sideCtx, sideCanvas, Math.ceil(w), Math.ceil(h));
                 drawImageFitted(sideCtx, image, 0, 0, w, h, 'cover');
                 sideCtx.globalCompositeOperation = 'destination-in';
                 sideCtx.fillStyle = '#000000';
@@ -174,36 +267,33 @@ export function createCompositor() {
     }
 
     function renderSplit(options, width, height, sideA, sideB) {
-        paintBackground(ctx, width, height, options.background);
+        blitBackground(ctx, width, height, options.background);
 
         const content = contentPadding(width, height, options);
         const radiusPct = clamp(Number(options.imageRadius) || 0, 0, 50) / 100;
         const radius = Math.min(content.width, content.height) * radiusPct;
+        const fitMode = options.fitMode || 'cover';
 
-        ctx.save();
-        if (radius > 0) {
-            roundRectPath(ctx, content.x, content.y, content.width, content.height, radius);
-            ctx.clip();
-        }
-
-        drawImageFitted(
-            ctx,
+        sideAKey = ensureFittedSide(
+            sideACanvas,
+            sideACtx,
+            sideAKey,
             sideA,
-            content.x,
-            content.y,
             content.width,
             content.height,
-            options.fitMode || 'cover',
+            fitMode,
+        );
+        sideBKey = ensureFittedSide(
+            sideBBaseCanvas,
+            sideBBaseCtx,
+            sideBKey,
+            sideB,
+            content.width,
+            content.height,
+            fitMode,
         );
 
-        sideCanvas.width = content.width;
-        sideCanvas.height = content.height;
-        sideCtx.clearRect(0, 0, content.width, content.height);
-        drawImageFitted(sideCtx, sideB, 0, 0, content.width, content.height, options.fitMode || 'cover');
-
-        maskCanvas.width = content.width;
-        maskCanvas.height = content.height;
-        paintSplitMask(maskCtx, content.width, content.height, {
+        const maskOptions = {
             layoutFamily: options.layoutFamily || options.layout,
             layoutVariant: options.layoutVariant,
             splitPosition: options.splitPosition,
@@ -212,8 +302,19 @@ export function createCompositor() {
             invertMask: options.invertMask,
             maskDensity: options.maskDensity,
             diagonalAngle: options.diagonalAngle,
-        });
+        };
+        ensureMask(content.width, content.height, maskOptions);
 
+        ctx.save();
+        if (radius > 0) {
+            roundRectPath(ctx, content.x, content.y, content.width, content.height, radius);
+            ctx.clip();
+        }
+
+        ctx.drawImage(sideACanvas, content.x, content.y);
+
+        clearCanvas(sideCtx, sideCanvas, content.width, content.height);
+        sideCtx.drawImage(sideBBaseCanvas, 0, 0);
         sideCtx.globalCompositeOperation = 'destination-in';
         sideCtx.drawImage(maskCanvas, 0, 0);
         sideCtx.globalCompositeOperation = 'source-over';
@@ -227,13 +328,14 @@ export function createCompositor() {
         const width = Math.max(1, Math.round(options.width || 1280));
         const height = Math.max(1, Math.round(options.height || 720));
 
-        canvas.width = width;
-        canvas.height = height;
+        if (!ensureCanvasSize(canvas, width, height)) {
+            ctx.clearRect(0, 0, width, height);
+        }
 
         const { sideA, sideB } = resolveSides(options);
 
         if (!sideA && !sideB) {
-            paintBackground(ctx, width, height, options.background || { type: 'solid', bg: '#FAFAFA' });
+            blitBackground(ctx, width, height, options.background || { type: 'solid', bg: '#FAFAFA' });
             ctx.fillStyle = '#A3A3A3';
             ctx.font = '500 18px Inter, sans-serif';
             ctx.textAlign = 'center';
@@ -253,7 +355,7 @@ export function createCompositor() {
         return canvas;
     }
 
-    function paintLabels(ctx, width, height, options) {
+    function paintLabels(labelCtx, width, height, options) {
         const labels = options.labels;
         if (!labels?.enabled) {
             return;
@@ -291,11 +393,11 @@ export function createCompositor() {
                 return;
             }
 
-            ctx.save();
-            ctx.font = `600 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const textWidth = ctx.measureText(text).width;
+            labelCtx.save();
+            labelCtx.font = `600 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
+            labelCtx.textAlign = 'center';
+            labelCtx.textBaseline = 'middle';
+            const textWidth = labelCtx.measureText(text).width;
             const padX = fontSize * 0.72;
             const padY = fontSize * 0.42;
             const pillW = textWidth + padX * 2;
@@ -308,12 +410,12 @@ export function createCompositor() {
             }
             const topY = y - pillH / 2;
 
-            ctx.fillStyle = 'rgba(23, 23, 23, 0.72)';
-            roundRectPath(ctx, left, topY, pillW, pillH, pillH / 2);
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(text, left + pillW / 2, y + 0.5);
-            ctx.restore();
+            labelCtx.fillStyle = 'rgba(23, 23, 23, 0.72)';
+            roundRectPath(labelCtx, left, topY, pillW, pillH, pillH / 2);
+            labelCtx.fill();
+            labelCtx.fillStyle = '#ffffff';
+            labelCtx.fillText(text, left + pillW / 2, y + 0.5);
+            labelCtx.restore();
         };
 
         if (horizontal) {
@@ -341,11 +443,10 @@ export function createCompositor() {
         // 1:1 full resolution preview (scroll the stage; do not downscale)
         const drawWidth = canvas.width;
         const drawHeight = canvas.height;
-        previewCanvas.width = drawWidth;
-        previewCanvas.height = drawHeight;
-
         const pctx = previewCanvas.getContext('2d');
-        pctx.clearRect(0, 0, drawWidth, drawHeight);
+        if (!ensureCanvasSize(previewCanvas, drawWidth, drawHeight)) {
+            pctx.clearRect(0, 0, drawWidth, drawHeight);
+        }
         pctx.imageSmoothingEnabled = false;
         pctx.drawImage(canvas, 0, 0);
 
