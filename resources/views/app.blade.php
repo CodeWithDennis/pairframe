@@ -472,17 +472,26 @@
                     <div class="flex items-center gap-3">
                         <span
                             class="text-xs text-zinc-400"
-                            x-show="hasBothImages"
+                            x-show="hasBothImages && !videoPreviewing"
                             x-cloak
                             x-text="previewSizeLabel + (layout === 'overlap' ? '' : (layout === 'diagonal' ? (previewTool === 'angle' ? ' · drag to rotate' : ' · drag to move') : ' · drag to fine-tune'))"
                         ></span>
+                        <span class="text-xs text-zinc-400" x-show="videoPreviewing" x-cloak>Playing wipe preview</span>
                         <span class="text-xs text-lumis-status-uploading" x-show="sizeWarning" x-text="sizeWarning" x-cloak></span>
+                        <button
+                            type="button"
+                            class="text-xs font-medium text-zinc-400 hover:text-lumis-ink"
+                            x-show="canPreviewVideo"
+                            x-cloak
+                            @click="toggleVideoPreview()"
+                            x-text="videoPreviewing ? 'Stop preview' : 'Play preview'"
+                        ></button>
                         <button
                             type="button"
                             class="text-xs font-medium text-zinc-400 hover:text-lumis-ink"
                             x-show="hasBothImages"
                             x-cloak
-                            @click="clearImages()"
+                            @click="stopVideoPreview(); clearImages()"
                         >
                             Replace images
                         </button>
@@ -592,13 +601,13 @@
 
                     <p class="mb-2 text-xs font-medium text-lumis-ink">Format</p>
                     <div class="mb-3 flex flex-wrap gap-1.5">
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'png')" @click="exportFormat = 'png'">PNG</button>
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'jpg')" @click="exportFormat = 'jpg'">JPG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'png')" @click="stopVideoPreview(); exportFormat = 'png'">PNG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'jpg')" @click="stopVideoPreview(); exportFormat = 'jpg'">JPG</button>
                         <button
                             type="button"
                             class="px-2.5 py-1.5 text-xs font-medium"
                             :class="segmentClass(exportFormat === 'video')"
-                            :title="usesSplit ? 'Wipe animation as WebM at source resolution' : 'Video needs a split layout'"
+                            :title="usesSplit ? 'Wipe animation at source resolution' : 'Video needs a split layout'"
                             @click="exportFormat = 'video'"
                         >Video</button>
                     </div>
@@ -678,9 +687,17 @@
                         <div x-show="usesSplit" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">Direction</p>
                             <div class="flex flex-wrap gap-1.5">
-                                <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(!videoReverse)" @click="videoReverse = false">A → B</button>
-                                <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(videoReverse)" @click="videoReverse = true">B → A</button>
+                                <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(!videoReverse)" @click="stopVideoPreview(); videoReverse = false">A → B</button>
+                                <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(videoReverse)" @click="stopVideoPreview(); videoReverse = true">B → A</button>
                             </div>
+                        </div>
+                        <div x-show="canPreviewVideo || videoPreviewing" x-cloak>
+                            <button
+                                type="button"
+                                class="inline-flex h-8 w-full items-center justify-center border border-lumis-panel-line bg-lumis-panel-surface text-[13px] font-medium text-lumis-ink hover:bg-lumis-segment-idle"
+                                @click="toggleVideoPreview()"
+                                x-text="videoPreviewing ? 'Stop preview' : 'Play preview'"
+                            ></button>
                         </div>
                     </div>
                 </section>

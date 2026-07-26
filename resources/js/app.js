@@ -57,6 +57,8 @@ document.addEventListener('alpine:init', () => {
         videoFps: 30,
         videoReverse: false,
         videoContainer: 'auto',
+        videoPreviewing: false,
+        _videoPreviewToken: 0,
         exporting: false,
         statusMessage: '',
         theme: 'auto',
@@ -192,6 +194,10 @@ document.addEventListener('alpine:init', () => {
             return this.exportFormat === 'png' || this.exportFormat === 'jpg';
         },
 
+        get canPreviewVideo() {
+            return this.hasBothImages && this.usesSplit && this.exportFormat === 'video' && !this.exporting;
+        },
+
         get exportSizeLabel() {
             const { width, height } =
                 this.exportFormat === 'video' ? this.resolveVideoSize() : this.resolveExportSize();
@@ -207,7 +213,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         get showsDragHandle() {
-            return this.hasBothImages && (this.previewHovered || this.dragging);
+            return this.hasBothImages && !this.videoPreviewing && (this.previewHovered || this.dragging);
         },
 
         setPreviewHovered(hovered) {
@@ -239,8 +245,68 @@ document.addEventListener('alpine:init', () => {
         },
 
         selectLayout(id) {
+            this.stopVideoPreview();
             this.layout = id;
             this.previewTool = id === 'diagonal' ? 'angle' : 'position';
+        },
+
+        stopVideoPreview() {
+            this._videoPreviewToken += 1;
+            if (this.videoPreviewing) {
+                this.videoPreviewing = false;
+                this.render();
+            }
+        },
+
+        async playVideoPreview() {
+            if (!this.canPreviewVideo || this.videoPreviewing) {
+                return;
+            }
+
+            this.videoPreviewing = true;
+            const token = ++this._videoPreviewToken;
+            const fps = this.videoFps;
+            const frameCount = Math.max(2, Math.round(fps * this.videoDuration));
+            const frameDelay = 1000 / fps;
+            const preview = this.$refs.previewCanvas;
+
+            try {
+                for (let i = 0; i <= frameCount; i++) {
+                    if (token !== this._videoPreviewToken || !this.canPreviewVideo) {
+                        return;
+                    }
+
+                    const t = i / frameCount;
+                    const split = this.videoReverse ? 1 - t : t;
+                    const options = this.buildOptions(this.baseWidth, this.baseHeight);
+                    options.splitPosition = clamp(split, 0, 1);
+                    this.compositor.render(options);
+
+                    if (preview) {
+                        this.previewMetrics = this.compositor.drawPreview(preview);
+                    }
+
+                    this.statusMessage = `Preview… ${Math.round((i / frameCount) * 100)}%`;
+                    await wait(frameDelay);
+                }
+
+                if (token === this._videoPreviewToken) {
+                    this.statusMessage = 'Preview finished.';
+                }
+            } finally {
+                if (token === this._videoPreviewToken) {
+                    this.videoPreviewing = false;
+                    this.render();
+                }
+            }
+        },
+
+        toggleVideoPreview() {
+            if (this.videoPreviewing) {
+                this.stopVideoPreview();
+                return;
+            }
+            this.playVideoPreview();
         },
 
         setPreviewTool(tool) {
@@ -1035,6 +1101,7 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            this.stopVideoPreview();
             this.exporting = true;
             this.statusMessage = 'Exporting…';
 
