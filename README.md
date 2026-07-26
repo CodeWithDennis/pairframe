@@ -17,6 +17,15 @@ Prebuilt macOS and Windows installers are available on the [GitHub Releases](htt
 
 Alternatively, skip the release binaries and [build the app yourself locally](#build-locally) — that does not require changing privacy settings for a downloaded installer.
 
+### Auto-updates
+
+Production builds ship with the NativePHP / electron-updater client pointed at GitHub Releases.
+
+- **Windows:** updates can work without code signing (SmartScreen may still warn).
+- **macOS:** automatic updates only work for **signed and notarized** builds. Unsigned CI builds still need a manual download from Releases.
+- Existing installs from before the updater was enabled need **one manual update**; later versions update themselves.
+- Public GitHub Releases need no client token. If the repo were private again, set `GITHUB_PRIVATE=true` and a read-only `GITHUB_AUTOUPDATE_TOKEN` secret.
+
 ## Requirements
 
 - PHP 8.3+
