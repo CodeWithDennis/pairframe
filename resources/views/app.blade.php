@@ -624,8 +624,24 @@
                     </div>
 
                     <div class="mt-3 space-y-3" x-show="exportFormat === 'video'" x-cloak>
-                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak>WebM wipe · source resolution</p>
+                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak>Wipe animation · source resolution</p>
                         <p class="text-xs text-lumis-status-uploading" x-show="!usesSplit" x-cloak>Switch to Vertical, Horizontal, or Diagonal for video.</p>
+                        <div x-show="usesSplit" x-cloak>
+                            <p class="mb-1.5 text-xs font-medium text-lumis-ink">Container</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in videoContainerOptions" :key="option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
+                                        :class="segmentClass(videoContainer === option.id)"
+                                        :disabled="(option.id === 'mp4' && !supportsMp4Video) || (option.id === 'webm' && !supportsWebmVideo)"
+                                        :title="option.id === 'mp4' && !supportsMp4Video ? 'MP4 not supported here' : (option.id === 'webm' && !supportsWebmVideo ? 'WebM not supported here' : '')"
+                                        @click="videoContainer = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
                         <div x-show="usesSplit" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Duration</label>

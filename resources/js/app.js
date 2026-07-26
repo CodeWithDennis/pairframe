@@ -56,6 +56,7 @@ document.addEventListener('alpine:init', () => {
         videoDuration: 2,
         videoFps: 30,
         videoReverse: false,
+        videoContainer: 'auto',
         exporting: false,
         statusMessage: '',
         theme: 'auto',
@@ -64,6 +65,12 @@ document.addEventListener('alpine:init', () => {
             { id: 24, label: '24' },
             { id: 30, label: '30' },
             { id: 60, label: '60' },
+        ],
+
+        videoContainerOptions: [
+            { id: 'auto', label: 'Auto' },
+            { id: 'mp4', label: 'MP4' },
+            { id: 'webm', label: 'WebM' },
         ],
 
         presets: [],
@@ -272,6 +279,7 @@ document.addEventListener('alpine:init', () => {
                 videoDuration: this.videoDuration,
                 videoFps: this.videoFps,
                 videoReverse: this.videoReverse,
+                videoContainer: this.videoContainer,
             };
         },
 
@@ -372,6 +380,9 @@ document.addEventListener('alpine:init', () => {
             }
             if (typeof settings.videoReverse === 'boolean') {
                 this.videoReverse = settings.videoReverse;
+            }
+            if (['auto', 'mp4', 'webm'].includes(settings.videoContainer)) {
+                this.videoContainer = settings.videoContainer;
             }
 
             this.previewTool = this.layout === 'diagonal' ? 'angle' : 'position';
@@ -667,9 +678,43 @@ document.addEventListener('alpine:init', () => {
             return { width, height };
         },
 
+        isVideoMimeSupported(type) {
+            return typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type);
+        },
+
+        firstSupportedMime(types) {
+            return types.find((type) => this.isVideoMimeSupported(type)) || '';
+        },
+
         pickVideoMimeType() {
-            const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-            return types.find((type) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) || '';
+            const mp4Types = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4'];
+            const webmTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+
+            if (this.videoContainer === 'mp4') {
+                const mimeType = this.firstSupportedMime(mp4Types);
+                return mimeType ? { mimeType, extension: 'mp4', label: 'MP4' } : null;
+            }
+
+            if (this.videoContainer === 'webm') {
+                const mimeType = this.firstSupportedMime(webmTypes);
+                return mimeType ? { mimeType, extension: 'webm', label: 'WebM' } : null;
+            }
+
+            const mp4 = this.firstSupportedMime(mp4Types);
+            if (mp4) {
+                return { mimeType: mp4, extension: 'mp4', label: 'MP4' };
+            }
+
+            const webm = this.firstSupportedMime(webmTypes);
+            return webm ? { mimeType: webm, extension: 'webm', label: 'WebM' } : null;
+        },
+
+        get supportsMp4Video() {
+            return Boolean(this.firstSupportedMime(['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4']));
+        },
+
+        get supportsWebmVideo() {
+            return Boolean(this.firstSupportedMime(['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']));
         },
 
         async recordWipeVideo(width, height) {
@@ -677,11 +722,13 @@ document.addEventListener('alpine:init', () => {
                 throw new Error('MediaRecorder is not supported in this environment.');
             }
 
-            const mimeType = this.pickVideoMimeType();
-            if (!mimeType) {
-                throw new Error('WebM video export is not supported in this environment.');
+            const picked = this.pickVideoMimeType();
+            if (!picked) {
+                const wanted = this.videoContainer === 'auto' ? 'MP4/WebM' : this.videoContainer.toUpperCase();
+                throw new Error(`${wanted} video export is not supported in this environment.`);
             }
 
+            const { mimeType, extension, label } = picked;
             const fps = this.videoFps;
             const durationSec = this.videoDuration;
             const frameCount = Math.max(2, Math.round(fps * durationSec));
@@ -728,7 +775,7 @@ document.addEventListener('alpine:init', () => {
                 if (typeof track.requestFrame === 'function') {
                     track.requestFrame();
                 }
-                this.statusMessage = `Recording video… ${Math.round((i / frameCount) * 100)}%`;
+                this.statusMessage = `Recording ${label}… ${Math.round((i / frameCount) * 100)}%`;
                 await wait(frameDelay);
             }
 
@@ -737,12 +784,12 @@ document.addEventListener('alpine:init', () => {
             stream.getTracks().forEach((item) => item.stop());
             await stopped;
 
-            const blob = new Blob(chunks, { type: 'video/webm' });
+            const blob = new Blob(chunks, { type: extension === 'mp4' ? 'video/mp4' : 'video/webm' });
             if (!blob.size) {
                 throw new Error('Recording produced an empty file.');
             }
 
-            return blob;
+            return { blob, extension, label };
         },
 
         buildOptions(width, height) {
@@ -1002,9 +1049,9 @@ document.addEventListener('alpine:init', () => {
 
                     const { width, height } = this.resolveVideoSize();
                     this.statusMessage = 'Recording video…';
-                    const blob = await this.recordWipeVideo(width, height);
-                    this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.webm`);
-                    this.statusMessage = `Exported video (${width} × ${height}).`;
+                    const { blob, extension, label } = await this.recordWipeVideo(width, height);
+                    this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${extension}`);
+                    this.statusMessage = `Exported ${label} (${width} × ${height}).`;
                     return;
                 }
 
