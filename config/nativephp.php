@@ -99,26 +99,27 @@ return [
          * updater will only work when your application is bundled
          * for production.
          */
-        'enabled' => env('NATIVEPHP_UPDATER_ENABLED', true),
+        'enabled' => filter_var(env('NATIVEPHP_UPDATER_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
 
         /**
          * The updater provider to use.
          * Supported: "github", "s3", "spaces"
          * Note: The "s3" provider is compatible with S3-compatible services like Cloudflare R2.
          */
-        'default' => env('NATIVEPHP_UPDATER_PROVIDER', 'spaces'),
+        'default' => env('NATIVEPHP_UPDATER_PROVIDER', 'github'),
 
         'providers' => [
             'github' => [
                 'driver' => 'github',
-                'repo' => env('GITHUB_REPO'),
-                'owner' => env('GITHUB_OWNER'),
+                'repo' => env('GITHUB_REPO', 'pairframe'),
+                'owner' => env('GITHUB_OWNER', 'CodeWithDennis'),
                 'token' => env('GITHUB_TOKEN'),
-                'vPrefixedTagName' => env('GITHUB_V_PREFIXED_TAG_NAME', true),
-                'private' => env('GITHUB_PRIVATE', false),
+                'vPrefixedTagName' => filter_var(env('GITHUB_V_PREFIXED_TAG_NAME', true), FILTER_VALIDATE_BOOLEAN),
+                // Public releases: no client token needed. Set true + GITHUB_AUTOUPDATE_TOKEN only if the repo is private.
+                'private' => filter_var(env('GITHUB_PRIVATE', false), FILTER_VALIDATE_BOOLEAN),
                 'autoupdate_token' => env('GITHUB_AUTOUPDATE_TOKEN'), // Read-only token used by the updater for private repos
                 'channel' => env('GITHUB_CHANNEL', 'latest'),
-                'releaseType' => env('GITHUB_RELEASE_TYPE', 'draft'),
+                'releaseType' => env('GITHUB_RELEASE_TYPE', 'release'),
             ],
 
             's3' => [
@@ -128,7 +129,7 @@ return [
                 'region' => env('AWS_DEFAULT_REGION'),
                 'bucket' => env('AWS_BUCKET'),
                 'endpoint' => env('AWS_ENDPOINT'),
-                'path' => env('NATIVEPHP_UPDATER_PATH', null),
+                'path' => env('NATIVEPHP_UPDATER_PATH'),
                 /**
                  * Optional public URL for serving updates (e.g., CDN or custom domain).
                  * When set, updates will be downloaded from this URL instead of the S3 endpoint.
@@ -144,7 +145,7 @@ return [
                 'secret' => env('DO_SPACES_SECRET_ACCESS_KEY'),
                 'name' => env('DO_SPACES_NAME'),
                 'region' => env('DO_SPACES_REGION'),
-                'path' => env('NATIVEPHP_UPDATER_PATH', null),
+                'path' => env('NATIVEPHP_UPDATER_PATH'),
             ],
         ],
     ],
@@ -184,5 +185,5 @@ return [
     /**
      * Custom PHP binary path.
      */
-    'binary_path' => env('NATIVEPHP_PHP_BINARY_PATH', null),
+    'binary_path' => env('NATIVEPHP_PHP_BINARY_PATH'),
 ];
