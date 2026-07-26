@@ -2,6 +2,8 @@
 
 NativePHP desktop app to compose two screenshots into split thumbnails with background patterns.
 
+![Pairframe composing a diagonal wavy split thumbnail](docs/pairframe.png)
+
 ## Requirements
 
 - PHP 8.3+

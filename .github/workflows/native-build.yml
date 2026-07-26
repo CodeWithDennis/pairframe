@@ -1,0 +1,153 @@
+name: Native Builds
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'App version (e.g. 1.0.1). Defaults to tag or 0.0.0-dev.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            arch: arm64
+            label: macOS Apple Silicon
+          - os: macos-latest
+            platform: mac
+            arch: x64
+            label: macOS Intel
+          - os: windows-latest
+            platform: win
+            arch: x64
+            label: Windows x64
+
+    env:
+      NATIVEPHP_UPDATER_ENABLED: false
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Prepare application
+        shell: bash
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+
+          echo "NATIVEPHP_APP_VERSION=${VERSION}" >> .env
+          echo "Building Pairframe ${VERSION} for ${{ matrix.platform }}-${{ matrix.arch }}"
+
+      # Do not use --publish: NativePHP's electronPath($subpath) resolves published
+      # roots incorrectly, so icons would land in vendor while electron-builder
+      # still packs the default NativePHP icon from nativephp/electron/build.
+      - name: Install NativePHP Electron scaffold
+        run: php artisan native:install --force --no-interaction
+
+      - name: Install app icons into Electron build resources
+        shell: bash
+        run: |
+          for dir in \
+            "vendor/nativephp/desktop/resources/electron/build" \
+            "vendor/nativephp/desktop/resources/build" \
+            "nativephp/electron/build"
+          do
+            mkdir -p "$dir"
+            cp public/icon.png "$dir/icon.png"
+            # Prefer regenerating platform icons from our PNG
+            rm -f "$dir/icon.icns" "$dir/icon.ico"
+          done
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Build native app
+        run: php artisan native:build ${{ matrix.platform }} ${{ matrix.arch }} --no-interaction
+
+      - name: List build output
+        shell: bash
+        run: ls -lah nativephp/electron/dist/ || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pairframe-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            nativephp/electron/dist/*.dmg
+            nativephp/electron/dist/*.zip
+            nativephp/electron/dist/*.exe
+            nativephp/electron/dist/*.AppImage
+            nativephp/electron/dist/*.deb
+            nativephp/electron/dist/*.yml
+            nativephp/electron/dist/*.blockmap
+          if-no-files-found: warn
+          retention-days: 14
+
+  release:
+    name: Attach to GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release files
+        run: find artifacts -type f | sort
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.yml
+            artifacts/**/*.blockmap
