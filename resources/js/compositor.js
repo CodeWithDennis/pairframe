@@ -74,8 +74,10 @@ export function createCompositor() {
         paintBackground(ctx, width, height, options.background);
 
         const variant = options.layoutVariant || 'cards';
-        const offsetX = ((Number(options.overlapOffsetX) || 12) / 100) * width * 0.25;
-        const offsetY = ((Number(options.overlapOffsetY) || 10) / 100) * height * 0.25;
+        const offsetXRaw = Number(options.overlapOffsetX);
+        const offsetYRaw = Number(options.overlapOffsetY);
+        const offsetX = ((Number.isFinite(offsetXRaw) ? offsetXRaw : 12) / 100) * width * 0.25;
+        const offsetY = ((Number.isFinite(offsetYRaw) ? offsetYRaw : 10) / 100) * height * 0.25;
         const shadowBlur = Number.isFinite(Number(options.overlapShadow))
             ? Math.max(0, Number(options.overlapShadow))
             : 28;

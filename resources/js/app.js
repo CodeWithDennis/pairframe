@@ -163,7 +163,12 @@ document.addEventListener('alpine:init', () => {
                     this.imageA,
                     this.imageB,
                 ],
-                () => this.render(),
+                () => {
+                    if (this.exporting || this.videoPreviewing) {
+                        return;
+                    }
+                    this.render();
+                },
             );
 
             this.$nextTick(() => this.render());
@@ -432,7 +437,7 @@ document.addEventListener('alpine:init', () => {
             }
             if (['png', 'jpg', 'video'].includes(settings.exportFormat)) {
                 this.exportFormat = settings.exportFormat;
-            } else if (settings.exportJpg && !settings.exportPng) {
+            } else if (settings.exportJpg && settings.exportPng !== true) {
                 this.exportFormat = 'jpg';
             }
             if (Number.isFinite(Number(settings.jpgQuality))) {
@@ -847,8 +852,8 @@ document.addEventListener('alpine:init', () => {
 
             await wait(Math.max(frameDelay * 2, 250));
             recorder.stop();
-            stream.getTracks().forEach((item) => item.stop());
             await stopped;
+            stream.getTracks().forEach((item) => item.stop());
 
             const blob = new Blob(chunks, { type: extension === 'mp4' ? 'video/mp4' : 'video/webm' });
             if (!blob.size) {
