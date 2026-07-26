@@ -608,7 +608,7 @@
                             class="px-2.5 py-1.5 text-xs font-medium"
                             :class="segmentClass(exportFormat === 'video')"
                             :title="usesSplit ? 'Wipe animation at source resolution' : 'Video needs a split layout'"
-                            @click="exportFormat = 'video'"
+                            @click="selectExportFormat('video')"
                         >Video</button>
                     </div>
 
