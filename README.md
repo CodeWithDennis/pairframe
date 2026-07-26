@@ -1,6 +1,6 @@
 # Pairframe
 
-NativePHP desktop app to compose two screenshots into split thumbnails with background patterns.
+NativePHP desktop app to compose two screenshots into split or overlap thumbnails, with background patterns and PNG, JPG, or wipe-video export.
 
 ![Pairframe composing a diagonal wavy split thumbnail](docs/pairframe.png)
 
@@ -91,10 +91,10 @@ Local builds are unsigned unless you configure Apple or Windows code signing. Pr
 ## Features
 
 - Upload two screenshots (PNG, JPG, WebP)
-- Layouts: vertical, horizontal, diagonal
+- Layouts: vertical, horizontal, diagonal, and overlap (cards, side, stack)
 - Diagonal styles: straight, wavy, zigzag, scallop, soft (with density)
-- Split position, angle, padding, and border radius
-- Side labels and swap sides
+- Split position, angle, padding, border radius, and optional shadow on overlap
+- Theme (light / dark / auto), side labels, badge, and swap sides
 - Background patterns with custom colors and density
 - Save / load settings presets (images are not stored)
-- Export PNG and/or JPG at optional scale (1×, 1.5×, 2×)
+- Export PNG or JPG at optional scale (1×, 1.5×, 2×), or wipe video (MP4 / WebM)
