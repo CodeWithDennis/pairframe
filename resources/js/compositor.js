@@ -249,7 +249,89 @@ export function createCompositor() {
             renderSplit(options, width, height, sideA || sideB, sideB || sideA);
         }
 
+        paintLabels(ctx, width, height, options);
+
         return canvas;
+    }
+
+    function paintLabels(ctx, width, height, options) {
+        const labels = options.labels;
+        if (!labels?.enabled) {
+            return;
+        }
+
+        const leftText = String(labels.left || '').trim();
+        const rightText = String(labels.right || '').trim();
+        const badgeText = String(labels.badge || '').trim();
+        if (!leftText && !rightText && !badgeText) {
+            return;
+        }
+
+        const family = options.layoutFamily || options.layout || 'vertical';
+        const leftPosition = labels.leftPosition || 'bottom';
+        const rightPosition = labels.rightPosition || 'bottom';
+        const badgePosition = labels.badgePosition || 'top';
+        const scale = clamp(Number(labels.size) || 100, 50, 160) / 100;
+        const fontSize = Math.max(11, Math.round(Math.min(width, height) * 0.032 * scale));
+        const inset = Math.max(10, Math.round(Math.min(width, height) * 0.025));
+        const content = contentPadding(width, height, options);
+        const horizontal = family === 'horizontal' || (family === 'fade' && (options.layoutVariant || '') === 'tb');
+
+        const axisPoint = (start, size, position) => {
+            if (position === 'top') {
+                return start + inset + fontSize * 0.9;
+            }
+            if (position === 'bottom') {
+                return start + size - inset - fontSize * 0.9;
+            }
+            return start + size / 2;
+        };
+
+        const drawPill = (text, x, y, align = 'center') => {
+            if (!text) {
+                return;
+            }
+
+            ctx.save();
+            ctx.font = `600 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const textWidth = ctx.measureText(text).width;
+            const padX = fontSize * 0.72;
+            const padY = fontSize * 0.42;
+            const pillW = textWidth + padX * 2;
+            const pillH = fontSize + padY * 2;
+            let left = x - pillW / 2;
+            if (align === 'left') {
+                left = x;
+            } else if (align === 'right') {
+                left = x - pillW;
+            }
+            const topY = y - pillH / 2;
+
+            ctx.fillStyle = 'rgba(23, 23, 23, 0.72)';
+            roundRectPath(ctx, left, topY, pillW, pillH, pillH / 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(text, left + pillW / 2, y + 0.5);
+            ctx.restore();
+        };
+
+        if (horizontal) {
+            const topY = content.y + inset + fontSize * 0.9;
+            const bottomY = content.y + content.height - inset - fontSize * 0.9;
+            const leftAlign = leftPosition === 'top' ? 'left' : leftPosition === 'bottom' ? 'right' : 'center';
+            const rightAlign = rightPosition === 'top' ? 'left' : rightPosition === 'bottom' ? 'right' : 'center';
+            drawPill(leftText, axisPoint(content.x, content.width, leftPosition), topY, leftAlign);
+            drawPill(rightText, axisPoint(content.x, content.width, rightPosition), bottomY, rightAlign);
+        } else {
+            drawPill(leftText, content.x + inset, axisPoint(content.y, content.height, leftPosition), 'left');
+            drawPill(rightText, content.x + content.width - inset, axisPoint(content.y, content.height, rightPosition), 'right');
+        }
+
+        if (badgeText) {
+            drawPill(badgeText, content.x + content.width / 2, axisPoint(content.y, content.height, badgePosition), 'center');
+        }
     }
 
     function drawPreview(previewCanvas) {

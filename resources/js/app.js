@@ -2,6 +2,7 @@ import Alpine from 'alpinejs';
 import { createCompositor } from './compositor.js';
 
 const PRESETS_STORAGE_KEY = 'pairframe.presets';
+const THEME_STORAGE_KEY = 'pairframe.theme';
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('pairframe', () => ({
@@ -26,6 +27,21 @@ document.addEventListener('alpine:init', () => {
         imagePadding: 0,
         imageRadius: 0,
 
+        labelsEnabled: false,
+        labelLeft: 'Left',
+        labelRight: 'Right',
+        labelBadge: '',
+        labelLeftPosition: 'bottom',
+        labelRightPosition: 'bottom',
+        labelBadgePosition: 'top',
+        labelSize: 100,
+
+        labelPositions: [
+            { id: 'top', label: 'Top', labelHorizontal: 'Left' },
+            { id: 'middle', label: 'Middle', labelHorizontal: 'Center' },
+            { id: 'bottom', label: 'Bottom', labelHorizontal: 'Right' },
+        ],
+
         backgroundType: 'dots',
         backgroundBg: '#FAFAFA',
         backgroundFg: '#E5E5E5',
@@ -37,6 +53,7 @@ document.addEventListener('alpine:init', () => {
         jpgQuality: 92,
         exporting: false,
         statusMessage: '',
+        theme: 'auto',
 
         presets: [],
         presetName: '',
@@ -78,6 +95,16 @@ document.addEventListener('alpine:init', () => {
 
         init() {
             this.compositor = createCompositor();
+            const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+            this.theme = storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'auto' ? storedTheme : 'auto';
+            this.applyTheme();
+            this._themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+            this._onThemeMedia = () => {
+                if (this.theme === 'auto') {
+                    this.applyTheme();
+                }
+            };
+            this._themeMedia.addEventListener('change', this._onThemeMedia);
             this.loadPresets();
             this.$watch(
                 () => [
@@ -89,6 +116,14 @@ document.addEventListener('alpine:init', () => {
                     this.swapSides,
                     this.imagePadding,
                     this.imageRadius,
+                    this.labelsEnabled,
+                    this.labelLeft,
+                    this.labelRight,
+                    this.labelBadge,
+                    this.labelLeftPosition,
+                    this.labelRightPosition,
+                    this.labelBadgePosition,
+                    this.labelSize,
                     this.backgroundType,
                     this.backgroundBg,
                     this.backgroundFg,
@@ -104,6 +139,19 @@ document.addEventListener('alpine:init', () => {
             this.$nextTick(() => this.render());
             this._onResize = () => this.updateHandle();
             window.addEventListener('resize', this._onResize);
+        },
+
+        setTheme(theme) {
+            this.theme = theme;
+            localStorage.setItem(THEME_STORAGE_KEY, theme);
+            this.applyTheme();
+        },
+
+        applyTheme() {
+            const dark =
+                this.theme === 'dark' ||
+                (this.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.classList.toggle('dark', dark);
         },
 
         get canExport() {
@@ -138,8 +186,8 @@ document.addEventListener('alpine:init', () => {
 
         segmentClass(active) {
             return active
-                ? 'bg-lumis-ink text-white'
-                : 'bg-lumis-segment-idle text-lumis-ink hover:bg-zinc-200';
+                ? 'bg-lumis-ink text-lumis-canvas'
+                : 'bg-lumis-segment-idle text-lumis-ink hover:bg-zinc-200 dark:hover:bg-zinc-800';
         },
 
         clampSlider(key, min, max) {
@@ -167,6 +215,14 @@ document.addEventListener('alpine:init', () => {
                 swapSides: this.swapSides,
                 imagePadding: this.imagePadding,
                 imageRadius: this.imageRadius,
+                labelsEnabled: this.labelsEnabled,
+                labelLeft: this.labelLeft,
+                labelRight: this.labelRight,
+                labelBadge: this.labelBadge,
+                labelLeftPosition: this.labelLeftPosition,
+                labelRightPosition: this.labelRightPosition,
+                labelBadgePosition: this.labelBadgePosition,
+                labelSize: this.labelSize,
                 backgroundType: this.backgroundType,
                 backgroundBg: this.backgroundBg,
                 backgroundFg: this.backgroundFg,
@@ -208,6 +264,31 @@ document.addEventListener('alpine:init', () => {
             }
             if (Number.isFinite(Number(settings.imageRadius))) {
                 this.imageRadius = Math.min(50, Math.max(0, Number(settings.imageRadius)));
+            }
+            if (typeof settings.labelsEnabled === 'boolean') {
+                this.labelsEnabled = settings.labelsEnabled;
+            }
+            if (typeof settings.labelLeft === 'string') {
+                this.labelLeft = settings.labelLeft;
+            }
+            if (typeof settings.labelRight === 'string') {
+                this.labelRight = settings.labelRight;
+            }
+            if (typeof settings.labelBadge === 'string') {
+                this.labelBadge = settings.labelBadge;
+            }
+            const positions = new Set(this.labelPositions.map((item) => item.id));
+            if (positions.has(settings.labelLeftPosition)) {
+                this.labelLeftPosition = settings.labelLeftPosition;
+            }
+            if (positions.has(settings.labelRightPosition)) {
+                this.labelRightPosition = settings.labelRightPosition;
+            }
+            if (positions.has(settings.labelBadgePosition)) {
+                this.labelBadgePosition = settings.labelBadgePosition;
+            }
+            if (Number.isFinite(Number(settings.labelSize))) {
+                this.labelSize = Math.min(160, Math.max(50, Number(settings.labelSize)));
             }
             if (backgrounds.has(settings.backgroundType)) {
                 this.backgroundType = settings.backgroundType;
@@ -299,6 +380,9 @@ document.addEventListener('alpine:init', () => {
             }
             if (Number(settings.imageRadius) > 0) {
                 parts.push(`radius ${Math.round(Number(settings.imageRadius))}%`);
+            }
+            if (settings.labelsEnabled) {
+                parts.push('labels');
             }
             if (settings.backgroundType) {
                 parts.push(String(settings.backgroundType));
@@ -529,6 +613,16 @@ document.addEventListener('alpine:init', () => {
                 diagonalAngle: this.diagonalAngle,
                 imagePadding: this.imagePadding,
                 imageRadius: this.imageRadius,
+                labels: {
+                    enabled: this.labelsEnabled,
+                    left: this.labelLeft,
+                    right: this.labelRight,
+                    badge: this.labelBadge,
+                    leftPosition: this.labelLeftPosition,
+                    rightPosition: this.labelRightPosition,
+                    badgePosition: this.labelBadgePosition,
+                    size: this.labelSize,
+                },
                 background: {
                     type: this.backgroundType,
                     bg: this.backgroundBg,

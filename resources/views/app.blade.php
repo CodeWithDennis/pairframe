@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'Pairframe') }}</title>
     <link rel="icon" type="image/png" href="/icon.png">
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('pairframe.theme');
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var dark = stored === 'dark' || ((stored === 'auto' || stored == null) && prefersDark);
+                if (dark) {
+                    document.documentElement.classList.add('dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
     @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
@@ -21,6 +33,10 @@
             color: #171717;
             transition: opacity 0.35s ease, visibility 0.35s ease;
         }
+        .dark #boot-screen {
+            background: #0c0c0b;
+            color: #f3f2f0;
+        }
         #boot-screen.is-done {
             opacity: 0;
             visibility: hidden;
@@ -30,6 +46,9 @@
             width: 44px;
             height: 44px;
             color: #171717;
+        }
+        .dark #boot-screen .boot-mark {
+            color: #f3f2f0;
         }
         #boot-screen .boot-name {
             font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -49,6 +68,9 @@
             background: #EBEBEB;
             border-radius: 999px;
         }
+        .dark #boot-screen .boot-bar {
+            background: #32302e;
+        }
         #boot-screen .boot-bar > i {
             display: block;
             width: 40%;
@@ -56,6 +78,9 @@
             background: #171717;
             border-radius: 999px;
             animation: boot-slide 1s ease-in-out infinite;
+        }
+        .dark #boot-screen .boot-bar > i {
+            background: #f3f2f0;
         }
         @keyframes boot-slide {
             0% { transform: translateX(-120%); }
@@ -105,6 +130,46 @@
 
             <div class="flex items-center gap-3">
                 <p class="text-xs font-normal text-zinc-400" x-text="statusMessage || exportSizeLabel"></p>
+                <div class="inline-flex gap-1" role="group" aria-label="Theme">
+                    <button
+                        type="button"
+                        class="inline-flex size-8 items-center justify-center"
+                        :class="segmentClass(theme === 'light')"
+                        aria-label="Light mode"
+                        title="Light"
+                        @click="setTheme('light')"
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <circle cx="12" cy="12" r="4" />
+                            <path stroke-linecap="round" d="M12 3v1.5M12 19.5V21M4.93 4.93l1.06 1.06M18 18l1.06 1.06M3 12h1.5M19.5 12H21M4.93 19.07l1.06-1.06M18 6l1.06-1.06" />
+                        </svg>
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex size-8 items-center justify-center"
+                        :class="segmentClass(theme === 'dark')"
+                        aria-label="Dark mode"
+                        title="Dark"
+                        @click="setTheme('dark')"
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+                        </svg>
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex size-8 items-center justify-center"
+                        :class="segmentClass(theme === 'auto')"
+                        aria-label="System theme"
+                        title="Auto"
+                        @click="setTheme('auto')"
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <rect x="3" y="4" width="18" height="12" rx="1.5" />
+                            <path stroke-linecap="round" d="M8 20h8M12 16v4" />
+                        </svg>
+                    </button>
+                </div>
                 <button
                     type="button"
                     class="inline-flex h-8 items-center border border-lumis-panel-line bg-lumis-panel-surface px-4 text-[13px] font-medium text-lumis-ink hover:bg-lumis-segment-idle"
@@ -121,7 +186,7 @@
                 </button>
                 <button
                     type="button"
-                    class="inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
+                    class="inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-lumis-canvas hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                     :disabled="!canExport || exporting"
                     @click="exportSelected()"
                 >
@@ -262,6 +327,80 @@
                         <input type="range" min="0" max="50" step="0.5" class="w-full" x-model.number="imageRadius">
                     </div>
                 </section>
+
+                <section>
+                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Labels</h2>
+                    <div class="mb-3 flex flex-wrap gap-1.5">
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(!labelsEnabled)" @click="labelsEnabled = false">Off</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(labelsEnabled)" @click="labelsEnabled = true">On</button>
+                    </div>
+                    <div class="space-y-3" x-show="labelsEnabled" x-cloak>
+                        <div>
+                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink" x-text="layout === 'horizontal' ? 'Top' : 'Left'"></span>
+                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelLeft" :placeholder="layout === 'horizontal' ? 'Top' : 'Left'">
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in labelPositions" :key="'left-' + option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(labelLeftPosition === option.id)"
+                                        @click="labelLeftPosition = option.id"
+                                        x-text="layout === 'horizontal' ? option.labelHorizontal : option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink" x-text="layout === 'horizontal' ? 'Bottom' : 'Right'"></span>
+                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelRight" :placeholder="layout === 'horizontal' ? 'Bottom' : 'Right'">
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in labelPositions" :key="'right-' + option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(labelRightPosition === option.id)"
+                                        @click="labelRightPosition = option.id"
+                                        x-text="layout === 'horizontal' ? option.labelHorizontal : option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Badge</span>
+                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelBadge" placeholder="v1.0">
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in labelPositions" :key="'badge-' + option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(labelBadgePosition === option.id)"
+                                        @click="labelBadgePosition = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Size</label>
+                                <div class="flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="50"
+                                        max="160"
+                                        step="1"
+                                        class="slider-value"
+                                        x-model.number="labelSize"
+                                        @blur="clampSlider('labelSize', 50, 160)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            <input type="range" min="50" max="160" step="1" class="w-full" x-model.number="labelSize">
+                        </div>
+                    </div>
+                </section>
             </aside>
 
             {{-- Center preview / upload --}}
@@ -321,9 +460,9 @@
                         <svg class="mb-3 size-4 text-lumis-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16" />
                         </svg>
-                        <p class="text-[13px] font-normal tracking-tight text-zinc-600">Drop 2 screenshots here</p>
+                        <p class="text-[13px] font-normal tracking-tight text-zinc-600 dark:text-zinc-400">Drop 2 screenshots here</p>
                         <p class="mt-1 text-xs font-normal text-zinc-400">PNG, JPG, or WebP — order does not matter</p>
-                        <label class="mt-4 inline-flex h-8 cursor-pointer items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-white hover:bg-black">
+                        <label class="mt-4 inline-flex h-8 cursor-pointer items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-lumis-canvas hover:opacity-90">
                             Browse files
                             <input type="file" accept="image/png,image/jpeg,image/webp" multiple class="sr-only" @change="onFileInput($event)">
                         </label>
@@ -369,11 +508,11 @@
                         </template>
                     </div>
                     <div class="mt-3 flex items-center gap-3">
-                        <label class="flex items-center gap-2 text-xs text-zinc-600">
+                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
                             <input type="color" x-model="backgroundBg">
                             Base
                         </label>
-                        <label class="flex items-center gap-2 text-xs text-zinc-600" x-show="backgroundType !== 'solid'" x-cloak>
+                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" x-show="backgroundType !== 'solid'" x-cloak>
                             <input type="color" x-model="backgroundFg">
                             Pattern
                         </label>
@@ -474,7 +613,7 @@
                         class="flex items-stretch gap-2 border border-lumis-panel-line px-3 py-2.5 transition-colors"
                         :class="selectedLoadPresetId === preset.id
                             ? 'bg-lumis-segment-idle'
-                            : 'bg-lumis-panel-surface hover:bg-zinc-50'"
+                            : 'bg-lumis-panel-surface hover:bg-lumis-segment-idle'"
                     >
                         <button
                             type="button"
@@ -511,7 +650,7 @@
                 <p class="mt-1 text-xs text-zinc-400">Save your current settings to reuse them later.</p>
                 <button
                     type="button"
-                    class="mt-4 inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-white hover:bg-black"
+                    class="mt-4 inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-lumis-canvas hover:opacity-90"
                     @click="closeLoadPresetModal(); openPresetModal()"
                 >Save preset</button>
             </div>
@@ -526,7 +665,7 @@
                     >Cancel</button>
                     <button
                         type="button"
-                        class="inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-40"
+                        class="inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-lumis-canvas hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                         :disabled="!selectedLoadPreset"
                         @click="loadSelectedPreset()"
                     >Load</button>
@@ -552,7 +691,7 @@
             aria-labelledby="preset-modal-title"
         >
             <h2 id="preset-modal-title" class="text-sm font-semibold tracking-tight text-lumis-display">Save preset</h2>
-            <p class="mt-1 text-xs text-zinc-400">Stores layout, split, background, and export settings — not images.</p>
+            <p class="mt-1 text-xs text-zinc-400">Stores layout, split, labels, background, and export settings — not images.</p>
             <label class="mt-4 block">
                 <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Name</span>
                 <input
@@ -573,7 +712,7 @@
                 >Cancel</button>
                 <button
                     type="button"
-                    class="inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-white hover:bg-black"
+                    class="inline-flex h-8 items-center border border-lumis-ink bg-lumis-ink px-4 text-[13px] font-medium text-lumis-canvas hover:opacity-90"
                     @click="savePreset()"
                 >Save</button>
             </div>
