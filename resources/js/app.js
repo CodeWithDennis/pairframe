@@ -21,6 +21,9 @@ document.addEventListener('alpine:init', () => {
         diagonalAngle: Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10,
         diagonalStyle: 'straight',
         diagonalDensity: 1.5,
+        overlapVariant: 'cards',
+        overlapOffset: 12,
+        overlapShadow: true,
         splitPosition: 50,
         previewTool: 'position',
         swapSides: false,
@@ -48,12 +51,29 @@ document.addEventListener('alpine:init', () => {
         backgroundDensity: 24,
 
         exportScale: '1',
-        exportPng: true,
-        exportJpg: false,
+        exportFormat: 'png',
         jpgQuality: 92,
+        videoDuration: 2,
+        videoFps: 30,
+        videoReverse: false,
+        videoContainer: 'auto',
+        videoPreviewing: false,
+        _videoPreviewToken: 0,
         exporting: false,
         statusMessage: '',
         theme: 'auto',
+
+        videoFpsOptions: [
+            { id: 24, label: '24' },
+            { id: 30, label: '30' },
+            { id: 60, label: '60' },
+        ],
+
+        videoContainerOptions: [
+            { id: 'auto', label: 'Auto' },
+            { id: 'mp4', label: 'MP4' },
+            { id: 'webm', label: 'WebM' },
+        ],
 
         presets: [],
         presetName: '',
@@ -73,6 +93,7 @@ document.addEventListener('alpine:init', () => {
             { id: 'vertical', label: 'Vertical' },
             { id: 'horizontal', label: 'Horizontal' },
             { id: 'diagonal', label: 'Diagonal' },
+            { id: 'overlap', label: 'Overlap' },
         ],
 
         diagonalStyles: [
@@ -81,6 +102,12 @@ document.addEventListener('alpine:init', () => {
             { id: 'zigzag', label: 'Zigzag' },
             { id: 'scallop', label: 'Scallop' },
             { id: 'soft', label: 'Soft' },
+        ],
+
+        overlapVariants: [
+            { id: 'cards', label: 'Cards' },
+            { id: 'side', label: 'Side' },
+            { id: 'stack', label: 'Stack' },
         ],
 
         backgroundOptions: [
@@ -112,6 +139,9 @@ document.addEventListener('alpine:init', () => {
                     this.diagonalAngle,
                     this.diagonalStyle,
                     this.diagonalDensity,
+                    this.overlapVariant,
+                    this.overlapOffset,
+                    this.overlapShadow,
                     this.splitPosition,
                     this.swapSides,
                     this.imagePadding,
@@ -133,7 +163,12 @@ document.addEventListener('alpine:init', () => {
                     this.imageA,
                     this.imageB,
                 ],
-                () => this.render(),
+                () => {
+                    if (this.exporting || this.videoPreviewing) {
+                        return;
+                    }
+                    this.render();
+                },
             );
 
             this.$nextTick(() => this.render());
@@ -155,11 +190,22 @@ document.addEventListener('alpine:init', () => {
         },
 
         get canExport() {
-            return Boolean(this.imageA && this.imageB) && (this.exportPng || this.exportJpg);
+            if (!this.imageA || !this.imageB) {
+                return false;
+            }
+            if (this.exportFormat === 'video') {
+                return this.usesSplit;
+            }
+            return this.exportFormat === 'png' || this.exportFormat === 'jpg';
+        },
+
+        get canPreviewVideo() {
+            return this.hasBothImages && this.usesSplit && this.exportFormat === 'video' && !this.exporting;
         },
 
         get exportSizeLabel() {
-            const { width, height } = this.resolveExportSize();
+            const { width, height } =
+                this.exportFormat === 'video' ? this.resolveVideoSize() : this.resolveExportSize();
             return `${width} × ${height}`;
         },
 
@@ -172,7 +218,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         get showsDragHandle() {
-            return this.hasBothImages && (this.previewHovered || this.dragging);
+            return this.hasBothImages && !this.videoPreviewing && (this.previewHovered || this.dragging);
         },
 
         setPreviewHovered(hovered) {
@@ -182,6 +228,14 @@ document.addEventListener('alpine:init', () => {
 
         get showsDiagonalDensity() {
             return this.layout === 'diagonal' && this.diagonalStyle !== 'straight' && this.diagonalStyle !== 'soft';
+        },
+
+        get usesSplit() {
+            return this.layout !== 'overlap';
+        },
+
+        get showsOverlapOffset() {
+            return this.layout === 'overlap' && this.overlapVariant !== 'side';
         },
 
         segmentClass(active) {
@@ -196,8 +250,68 @@ document.addEventListener('alpine:init', () => {
         },
 
         selectLayout(id) {
+            this.stopVideoPreview();
             this.layout = id;
             this.previewTool = id === 'diagonal' ? 'angle' : 'position';
+        },
+
+        stopVideoPreview() {
+            this._videoPreviewToken += 1;
+            if (this.videoPreviewing) {
+                this.videoPreviewing = false;
+                this.render();
+            }
+        },
+
+        async playVideoPreview() {
+            if (!this.canPreviewVideo || this.videoPreviewing) {
+                return;
+            }
+
+            this.videoPreviewing = true;
+            const token = ++this._videoPreviewToken;
+            const fps = this.videoFps;
+            const frameCount = Math.max(2, Math.round(fps * this.videoDuration));
+            const frameDelay = 1000 / fps;
+            const preview = this.$refs.previewCanvas;
+
+            try {
+                for (let i = 0; i <= frameCount; i++) {
+                    if (token !== this._videoPreviewToken || !this.canPreviewVideo) {
+                        return;
+                    }
+
+                    const t = i / frameCount;
+                    const split = this.videoReverse ? 1 - t : t;
+                    const options = this.buildOptions(this.baseWidth, this.baseHeight);
+                    options.splitPosition = clamp(split, 0, 1);
+                    this.compositor.render(options);
+
+                    if (preview) {
+                        this.previewMetrics = this.compositor.drawPreview(preview);
+                    }
+
+                    this.statusMessage = `Preview… ${Math.round((i / frameCount) * 100)}%`;
+                    await wait(frameDelay);
+                }
+
+                if (token === this._videoPreviewToken) {
+                    this.statusMessage = 'Preview finished.';
+                }
+            } finally {
+                if (token === this._videoPreviewToken) {
+                    this.videoPreviewing = false;
+                    this.render();
+                }
+            }
+        },
+
+        toggleVideoPreview() {
+            if (this.videoPreviewing) {
+                this.stopVideoPreview();
+                return;
+            }
+            this.playVideoPreview();
         },
 
         setPreviewTool(tool) {
@@ -211,6 +325,9 @@ document.addEventListener('alpine:init', () => {
                 diagonalAngle: this.diagonalAngle,
                 diagonalStyle: this.diagonalStyle,
                 diagonalDensity: this.diagonalDensity,
+                overlapVariant: this.overlapVariant,
+                overlapOffset: this.overlapOffset,
+                overlapShadow: this.overlapShadow,
                 splitPosition: this.splitPosition,
                 swapSides: this.swapSides,
                 imagePadding: this.imagePadding,
@@ -228,9 +345,12 @@ document.addEventListener('alpine:init', () => {
                 backgroundFg: this.backgroundFg,
                 backgroundDensity: this.backgroundDensity,
                 exportScale: this.exportScale,
-                exportPng: this.exportPng,
-                exportJpg: this.exportJpg,
+                exportFormat: this.exportFormat,
                 jpgQuality: this.jpgQuality,
+                videoDuration: this.videoDuration,
+                videoFps: this.videoFps,
+                videoReverse: this.videoReverse,
+                videoContainer: this.videoContainer,
             };
         },
 
@@ -241,6 +361,7 @@ document.addEventListener('alpine:init', () => {
 
             const layouts = new Set(this.layouts.map((item) => item.id));
             const styles = new Set(this.diagonalStyles.map((item) => item.id));
+            const overlaps = new Set(this.overlapVariants.map((item) => item.id));
             const backgrounds = new Set(this.backgroundOptions.map((item) => item.id));
 
             if (layouts.has(settings.layout)) {
@@ -254,6 +375,15 @@ document.addEventListener('alpine:init', () => {
             }
             if (Number.isFinite(Number(settings.diagonalDensity))) {
                 this.diagonalDensity = Math.min(100, Math.max(0.1, Number(settings.diagonalDensity)));
+            }
+            if (overlaps.has(settings.overlapVariant)) {
+                this.overlapVariant = settings.overlapVariant;
+            }
+            if (Number.isFinite(Number(settings.overlapOffset))) {
+                this.overlapOffset = Math.min(40, Math.max(0, Number(settings.overlapOffset)));
+            }
+            if (typeof settings.overlapShadow === 'boolean') {
+                this.overlapShadow = settings.overlapShadow;
             }
             if (Number.isFinite(Number(settings.splitPosition))) {
                 this.splitPosition = Math.min(100, Math.max(0, Number(settings.splitPosition)));
@@ -305,14 +435,25 @@ document.addEventListener('alpine:init', () => {
             if (['1', '1.5', '2'].includes(String(settings.exportScale))) {
                 this.exportScale = String(settings.exportScale);
             }
-            if (typeof settings.exportPng === 'boolean') {
-                this.exportPng = settings.exportPng;
-            }
-            if (typeof settings.exportJpg === 'boolean') {
-                this.exportJpg = settings.exportJpg;
+            if (['png', 'jpg', 'video'].includes(settings.exportFormat)) {
+                this.exportFormat = settings.exportFormat;
+            } else if (settings.exportJpg && settings.exportPng !== true) {
+                this.exportFormat = 'jpg';
             }
             if (Number.isFinite(Number(settings.jpgQuality))) {
                 this.jpgQuality = Math.min(100, Math.max(50, Number(settings.jpgQuality)));
+            }
+            if (Number.isFinite(Number(settings.videoDuration))) {
+                this.videoDuration = Math.min(6, Math.max(1, Number(settings.videoDuration)));
+            }
+            if ([24, 30, 60].includes(Number(settings.videoFps))) {
+                this.videoFps = Number(settings.videoFps);
+            }
+            if (typeof settings.videoReverse === 'boolean') {
+                this.videoReverse = settings.videoReverse;
+            }
+            if (['auto', 'mp4', 'webm'].includes(settings.videoContainer)) {
+                this.videoContainer = settings.videoContainer;
             }
 
             this.previewTool = this.layout === 'diagonal' ? 'angle' : 'position';
@@ -372,7 +513,10 @@ document.addEventListener('alpine:init', () => {
             if (settings.layout === 'diagonal' && settings.diagonalStyle) {
                 parts.push(String(settings.diagonalStyle));
             }
-            if (Number.isFinite(Number(settings.splitPosition))) {
+            if (settings.layout === 'overlap' && settings.overlapVariant) {
+                parts.push(String(settings.overlapVariant));
+            }
+            if (settings.layout !== 'overlap' && Number.isFinite(Number(settings.splitPosition))) {
                 parts.push(`${Math.round(Number(settings.splitPosition))}%`);
             }
             if (Number(settings.imagePadding) > 0) {
@@ -595,6 +739,130 @@ document.addEventListener('alpine:init', () => {
             };
         },
 
+        resolveVideoSize() {
+            const image = this.imageA || this.imageB;
+            let width = image?.naturalWidth || this.baseWidth;
+            let height = image?.naturalHeight || this.baseHeight;
+            // Encoders are happier with even dimensions.
+            width = Math.max(2, width - (width % 2));
+            height = Math.max(2, height - (height % 2));
+            return { width, height };
+        },
+
+        isVideoMimeSupported(type) {
+            return typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type);
+        },
+
+        firstSupportedMime(types) {
+            return types.find((type) => this.isVideoMimeSupported(type)) || '';
+        },
+
+        pickVideoMimeType() {
+            const mp4Types = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4'];
+            const webmTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+
+            if (this.videoContainer === 'mp4') {
+                const mimeType = this.firstSupportedMime(mp4Types);
+                return mimeType ? { mimeType, extension: 'mp4', label: 'MP4' } : null;
+            }
+
+            if (this.videoContainer === 'webm') {
+                const mimeType = this.firstSupportedMime(webmTypes);
+                return mimeType ? { mimeType, extension: 'webm', label: 'WebM' } : null;
+            }
+
+            const mp4 = this.firstSupportedMime(mp4Types);
+            if (mp4) {
+                return { mimeType: mp4, extension: 'mp4', label: 'MP4' };
+            }
+
+            const webm = this.firstSupportedMime(webmTypes);
+            return webm ? { mimeType: webm, extension: 'webm', label: 'WebM' } : null;
+        },
+
+        get supportsMp4Video() {
+            return Boolean(this.firstSupportedMime(['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/mp4']));
+        },
+
+        get supportsWebmVideo() {
+            return Boolean(this.firstSupportedMime(['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']));
+        },
+
+        async recordWipeVideo(width, height) {
+            if (typeof MediaRecorder === 'undefined') {
+                throw new Error('MediaRecorder is not supported in this environment.');
+            }
+
+            const picked = this.pickVideoMimeType();
+            if (!picked) {
+                const wanted = this.videoContainer === 'auto' ? 'MP4/WebM' : this.videoContainer.toUpperCase();
+                throw new Error(`${wanted} video export is not supported in this environment.`);
+            }
+
+            const { mimeType, extension, label } = picked;
+            const fps = this.videoFps;
+            const durationSec = this.videoDuration;
+            const frameCount = Math.max(2, Math.round(fps * durationSec));
+            const frameDelay = 1000 / fps;
+
+            const renderFrame = (split01) => {
+                const options = this.buildOptions(width, height);
+                options.splitPosition = clamp(split01, 0, 1);
+                this.compositor.render(options);
+            };
+
+            renderFrame(this.videoReverse ? 1 : 0);
+
+            const canvas = this.compositor.getCanvas();
+            const stream = canvas.captureStream(fps);
+            const track = stream.getVideoTracks()[0];
+            if (!track) {
+                throw new Error('Could not capture a video track from the canvas.');
+            }
+
+            const bits = Math.round(Math.min(25_000_000, Math.max(6_000_000, width * height * 6)));
+            const recorder = new MediaRecorder(stream, {
+                mimeType,
+                videoBitsPerSecond: bits,
+            });
+            const chunks = [];
+            recorder.ondataavailable = (event) => {
+                if (event.data?.size) {
+                    chunks.push(event.data);
+                }
+            };
+
+            const stopped = new Promise((resolve, reject) => {
+                recorder.onstop = () => resolve();
+                recorder.onerror = () => reject(recorder.error || new Error('Recording failed.'));
+            });
+
+            recorder.start(100);
+
+            for (let i = 0; i <= frameCount; i++) {
+                const t = i / frameCount;
+                const split = this.videoReverse ? 1 - t : t;
+                renderFrame(split);
+                if (typeof track.requestFrame === 'function') {
+                    track.requestFrame();
+                }
+                this.statusMessage = `Recording ${label}… ${Math.round((i / frameCount) * 100)}%`;
+                await wait(frameDelay);
+            }
+
+            await wait(Math.max(frameDelay * 2, 250));
+            recorder.stop();
+            await stopped;
+            stream.getTracks().forEach((item) => item.stop());
+
+            const blob = new Blob(chunks, { type: extension === 'mp4' ? 'video/mp4' : 'video/webm' });
+            if (!blob.size) {
+                throw new Error('Recording produced an empty file.');
+            }
+
+            return { blob, extension, label };
+        },
+
         buildOptions(width, height) {
             return {
                 lightImage: this.imageA,
@@ -602,7 +870,12 @@ document.addEventListener('alpine:init', () => {
                 width,
                 height,
                 layoutFamily: this.layout,
-                layoutVariant: this.layout === 'diagonal' ? this.diagonalStyle : 'hard',
+                layoutVariant:
+                    this.layout === 'diagonal'
+                        ? this.diagonalStyle
+                        : this.layout === 'overlap'
+                          ? this.overlapVariant
+                          : 'hard',
                 splitPosition: this.splitPosition / 100,
                 softEdge: 0,
                 swapSides: this.swapSides,
@@ -611,6 +884,9 @@ document.addEventListener('alpine:init', () => {
                 maskDensity: this.diagonalDensity,
                 fitMode: 'cover',
                 diagonalAngle: this.diagonalAngle,
+                overlapOffsetX: this.overlapOffset,
+                overlapOffsetY: this.overlapOffset,
+                overlapShadow: this.overlapShadow ? 28 : 0,
                 imagePadding: this.imagePadding,
                 imageRadius: this.imageRadius,
                 labels: {
@@ -830,44 +1106,45 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            this.stopVideoPreview();
             this.exporting = true;
             this.statusMessage = 'Exporting…';
 
             try {
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+                if (this.exportFormat === 'video') {
+                    if (!this.usesSplit) {
+                        this.statusMessage = 'Video export needs a split layout (not Overlap).';
+                        return;
+                    }
+
+                    const { width, height } = this.resolveVideoSize();
+                    this.statusMessage = 'Recording video…';
+                    const { blob, extension, label } = await this.recordWipeVideo(width, height);
+                    this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${extension}`);
+                    this.statusMessage = `Exported ${label} (${width} × ${height}).`;
+                    return;
+                }
+
                 const { width, height } = this.resolveExportSize();
                 this.compositor.render(this.buildOptions(width, height));
-                const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                const jobs = [];
+                const isJpg = this.exportFormat === 'jpg';
+                const blob = await this.compositor.exportBlob(
+                    isJpg ? 'image/jpeg' : 'image/png',
+                    isJpg ? clamp(this.jpgQuality / 100, 0.1, 1) : undefined,
+                );
 
-                if (this.exportPng) {
-                    jobs.push({
-                        mime: 'image/png',
-                        quality: undefined,
-                        name: `pairframe-${width}x${height}-${stamp}.png`,
-                    });
+                if (!blob) {
+                    this.statusMessage = 'Nothing exported.';
+                    return;
                 }
 
-                if (this.exportJpg) {
-                    jobs.push({
-                        mime: 'image/jpeg',
-                        quality: clamp(this.jpgQuality / 100, 0.1, 1),
-                        name: `pairframe-${width}x${height}-${stamp}.jpg`,
-                    });
-                }
-
-                for (const job of jobs) {
-                    const blob = await this.compositor.exportBlob(job.mime, job.quality);
-                    if (!blob) {
-                        continue;
-                    }
-                    this.downloadBlob(blob, job.name);
-                    await wait(120);
-                }
-
-                this.statusMessage = `Exported ${jobs.length} file${jobs.length === 1 ? '' : 's'} (${width} × ${height}).`;
+                this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${isJpg ? 'jpg' : 'png'}`);
+                this.statusMessage = `Exported ${isJpg ? 'JPG' : 'PNG'} (${width} × ${height}).`;
             } catch (error) {
                 console.error(error);
-                this.statusMessage = 'Export failed. Try again.';
+                this.statusMessage = error?.message || 'Export failed. Try again.';
             } finally {
                 this.exporting = false;
                 this.render();
