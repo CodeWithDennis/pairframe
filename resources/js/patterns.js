@@ -136,7 +136,10 @@ export function paintSplitMask(maskCtx, width, height, options = {}) {
     const softEdge = Math.max(0, Number(options.softEdge) || 0);
     const flip = Boolean(options.flipDirection);
     const invert = Boolean(options.invertMask);
-    const density = clamp(Number(options.maskDensity) || 28, 4, 160);
+    const density = clamp(Number(options.maskDensity) || 28, 0.1, 160);
+    const diagonalAngle = Number.isFinite(Number(options.diagonalAngle))
+        ? Number(options.diagonalAngle)
+        : (Math.atan2(height, width) * 180) / Math.PI;
 
     maskCtx.clearRect(0, 0, width, height);
     maskCtx.save();
@@ -184,37 +187,71 @@ export function paintSplitMask(maskCtx, width, height, options = {}) {
         }
     };
 
-    const paintDiagonal = (dir, soft) => {
-        const px = split * width;
-        maskCtx.beginPath();
-        if (dir === 'tl') {
+    const paintAngledSplit = (angleDeg, style = 'straight') => {
+        const span = Math.hypot(width, height) * 2;
+        const radians = (angleDeg * Math.PI) / 180;
+        const nx = -Math.sin(radians);
+        const ny = Math.cos(radians);
+        const offset = (split - 0.5) * Math.hypot(width, height);
+        const px = width / 2 + nx * offset;
+        const py = height / 2 + ny * offset;
+        const dens = clamp(density, 0.1, 100);
+        // Higher density → shorter interval → more waves (0.1 sparse … 100 tight)
+        const interval = Math.max(12, 500 / dens + 8);
+        const amp = Math.min(width, height) * (0.008 + Math.min(dens, 100) * 0.00018);
+
+        const fillAngledSide = () => {
             if (flip) {
-                maskCtx.moveTo(0, 0);
-                maskCtx.lineTo(px + height, 0);
-                maskCtx.lineTo(px - height, height);
-                maskCtx.lineTo(0, height);
+                maskCtx.lineTo(span, -span);
+                maskCtx.lineTo(-span, -span);
             } else {
-                maskCtx.moveTo(width, 0);
-                maskCtx.lineTo(width, height);
-                maskCtx.lineTo(0, height);
-                maskCtx.lineTo(px - height, height);
-                maskCtx.lineTo(px + height, 0);
+                maskCtx.lineTo(span, span);
+                maskCtx.lineTo(-span, span);
             }
+            maskCtx.closePath();
+            maskCtx.fill();
+        };
+
+        maskCtx.save();
+        maskCtx.translate(px, py);
+        maskCtx.rotate(radians);
+
+        if (style === 'wavy') {
+            const freq = (Math.PI * 2) / interval;
+            maskCtx.beginPath();
+            maskCtx.moveTo(-span, Math.sin(-span * freq) * amp);
+            for (let x = -span; x <= span; x += 2) {
+                maskCtx.lineTo(x, Math.sin(x * freq) * amp);
+            }
+            fillAngledSide();
+        } else if (style === 'zigzag') {
+            const step = Math.max(10, interval / 2);
+            let up = true;
+            maskCtx.beginPath();
+            maskCtx.moveTo(-span, 0);
+            for (let x = -span; x <= span; x += step) {
+                maskCtx.lineTo(x, up ? -amp : amp);
+                up = !up;
+            }
+            fillAngledSide();
+        } else if (style === 'scallop') {
+            const freq = (Math.PI * 2) / interval;
+            maskCtx.beginPath();
+            maskCtx.moveTo(-span, 0);
+            for (let x = -span; x <= span; x += 2) {
+                maskCtx.lineTo(x, Math.abs(Math.sin(x * freq)) * amp * 1.35);
+            }
+            fillAngledSide();
         } else if (flip) {
-            maskCtx.moveTo(width, 0);
-            maskCtx.lineTo(width, height);
-            maskCtx.lineTo(px - height, height);
-            maskCtx.lineTo(px + height, 0);
+            maskCtx.fillRect(-span, -span, span * 2, span);
         } else {
-            maskCtx.moveTo(0, 0);
-            maskCtx.lineTo(px + height, 0);
-            maskCtx.lineTo(px - height, height);
-            maskCtx.lineTo(0, height);
+            // Local +Y is one side of the angled line
+            maskCtx.fillRect(-span, 0, span * 2, span);
         }
-        maskCtx.closePath();
-        maskCtx.fill();
-        if (soft) {
-            blurMask(maskCtx, width, height, Math.max(softEdge, 36));
+        maskCtx.restore();
+
+        if (style === 'soft') {
+            blurMask(maskCtx, width, height, Math.max(softEdge, Math.min(width, height) * 0.035, 18));
         } else if (softEdge > 0) {
             blurMask(maskCtx, width, height, softEdge);
         }
@@ -272,30 +309,7 @@ export function paintSplitMask(maskCtx, width, height, options = {}) {
             maskCtx.fillRect(0, y, width, height - y);
         }
     } else if (family === 'diagonal') {
-        if (variant === 'corner') {
-            const size = split * Math.min(width, height) * 1.35;
-            maskCtx.beginPath();
-            if (flip) {
-                maskCtx.moveTo(width, height);
-                maskCtx.lineTo(width - size, height);
-                maskCtx.lineTo(width, height - size);
-            } else {
-                maskCtx.moveTo(0, 0);
-                maskCtx.lineTo(size, 0);
-                maskCtx.lineTo(0, size);
-            }
-            maskCtx.closePath();
-            maskCtx.fill();
-            blurMask(maskCtx, width, height, Math.max(softEdge, 20));
-        } else if (variant === 'tl-soft') {
-            paintDiagonal('tl', true);
-        } else if (variant === 'tr-soft') {
-            paintDiagonal('tr', true);
-        } else if (variant === 'tr') {
-            paintDiagonal('tr', false);
-        } else {
-            paintDiagonal('tl', false);
-        }
+        paintAngledSplit(diagonalAngle, variant || 'straight');
     } else if (family === 'fade') {
         if (variant === 'tb') {
             softHorizontal(split * height, Math.max(softEdge, width * 0.08, 64), flip);

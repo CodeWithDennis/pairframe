@@ -1,6 +1,6 @@
 # Pairframe
 
-NativePHP desktop app to compose light and dark screenshots into split, fade, and patterned thumbnails.
+NativePHP desktop app to compose two screenshots into split thumbnails with background patterns.
 
 ## Requirements
 
@@ -26,7 +26,7 @@ php artisan native:install --no-interaction
 composer run dev
 ```
 
-Open the app URL and upload a light + dark screenshot pair.
+Open the app URL and upload two screenshots.
 
 ## Run as desktop app
 
@@ -43,9 +43,12 @@ composer native:dev
 
 ## Features
 
-- Upload light / dark screenshots (PNG, JPG, WebP)
-- Layout families with variants: vertical, horizontal, diagonal, soft fade, zigzag, wave, checker, stripes, overlap
-- Swap light/dark, flip direction, invert mask
+- Upload two screenshots (PNG, JPG, WebP) — order does not matter
+- Layouts: vertical, horizontal, diagonal
+- Diagonal styles: straight, wavy, zigzag, scallop, soft (with density)
+- Split position, angle tools, padding, and border radius
+- Swap sides
 - Background patterns with custom colors and density
-- Drag the split handle in the live preview
-- Export PNG and/or JPG at upload resolution (optional scale / max width)
+- Save / load settings presets (images are not stored)
+- Hover-only drag handle on the live preview
+- Export PNG and/or JPG at upload resolution (optional scale)

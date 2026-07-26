@@ -19,6 +19,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
             ->height(900)
             ->minWidth(960)
             ->minHeight(700)
+            ->backgroundColor('#FAFAFA')
             ->rememberState()
             ->hideMenu();
     }

@@ -161,19 +161,50 @@ export function createCompositor() {
         }
     }
 
+    function contentPadding(width, height, options) {
+        const padPct = clamp(Number(options.imagePadding) || 0, 0, 40) / 100;
+        const pad = Math.round(Math.min(width, height) * padPct);
+        return {
+            pad,
+            x: pad,
+            y: pad,
+            width: Math.max(1, width - pad * 2),
+            height: Math.max(1, height - pad * 2),
+            percent: padPct * 100,
+        };
+    }
+
     function renderSplit(options, width, height, sideA, sideB) {
         paintBackground(ctx, width, height, options.background);
 
-        drawImageFitted(ctx, sideA, 0, 0, width, height, options.fitMode || 'cover');
+        const content = contentPadding(width, height, options);
+        const radiusPct = clamp(Number(options.imageRadius) || 0, 0, 50) / 100;
+        const radius = Math.min(content.width, content.height) * radiusPct;
 
-        sideCanvas.width = width;
-        sideCanvas.height = height;
-        sideCtx.clearRect(0, 0, width, height);
-        drawImageFitted(sideCtx, sideB, 0, 0, width, height, options.fitMode || 'cover');
+        ctx.save();
+        if (radius > 0) {
+            roundRectPath(ctx, content.x, content.y, content.width, content.height, radius);
+            ctx.clip();
+        }
 
-        maskCanvas.width = width;
-        maskCanvas.height = height;
-        paintSplitMask(maskCtx, width, height, {
+        drawImageFitted(
+            ctx,
+            sideA,
+            content.x,
+            content.y,
+            content.width,
+            content.height,
+            options.fitMode || 'cover',
+        );
+
+        sideCanvas.width = content.width;
+        sideCanvas.height = content.height;
+        sideCtx.clearRect(0, 0, content.width, content.height);
+        drawImageFitted(sideCtx, sideB, 0, 0, content.width, content.height, options.fitMode || 'cover');
+
+        maskCanvas.width = content.width;
+        maskCanvas.height = content.height;
+        paintSplitMask(maskCtx, content.width, content.height, {
             layoutFamily: options.layoutFamily || options.layout,
             layoutVariant: options.layoutVariant,
             splitPosition: options.splitPosition,
@@ -181,13 +212,15 @@ export function createCompositor() {
             flipDirection: options.flipDirection,
             invertMask: options.invertMask,
             maskDensity: options.maskDensity,
+            diagonalAngle: options.diagonalAngle,
         });
 
         sideCtx.globalCompositeOperation = 'destination-in';
         sideCtx.drawImage(maskCanvas, 0, 0);
         sideCtx.globalCompositeOperation = 'source-over';
 
-        ctx.drawImage(sideCanvas, 0, 0);
+        ctx.drawImage(sideCanvas, content.x, content.y);
+        ctx.restore();
     }
 
     function render(options) {
@@ -205,7 +238,7 @@ export function createCompositor() {
             ctx.fillStyle = '#A3A3A3';
             ctx.font = '500 18px Inter, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('Upload light and dark screenshots', width / 2, height / 2);
+            ctx.fillText('Upload two screenshots', width / 2, height / 2);
             return canvas;
         }
 
@@ -256,16 +289,20 @@ export function createCompositor() {
 
         const split = clamp(Number(options.splitPosition) ?? 0.5, 0, 1);
         const variant = options.layoutVariant || 'hard';
+        const padding = clamp(Number(options.imagePadding) || 0, 0, 40);
 
         if (family === 'horizontal' || (family === 'fade' && variant === 'tb')) {
-            return { axis: 'y', position: split };
+            return { axis: 'y', position: split, padding };
         }
 
         if (family === 'diagonal') {
-            return { axis: 'diagonal', position: split, dir: variant };
+            const angle = Number.isFinite(Number(options.diagonalAngle))
+                ? Number(options.diagonalAngle)
+                : 45;
+            return { axis: 'diagonal', position: split, angle, padding };
         }
 
-        return { axis: 'x', position: split };
+        return { axis: 'x', position: split, padding };
     }
 
     return {
