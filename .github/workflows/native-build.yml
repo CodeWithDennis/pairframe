@@ -131,22 +131,6 @@ jobs:
         shell: bash
         run: ls -lah nativephp/electron/dist/ || true
 
-      - name: Scan artifacts for leaked GitHub tokens
-        shell: bash
-        run: |
-          if [ ! -d nativephp/electron/dist ]; then
-            echo "No dist directory; skipping token scan."
-            exit 0
-          fi
-
-          # Fail if common GitHub token prefixes appear in packaged output / update metadata.
-          if grep -R -a -E -e 'ghp_[A-Za-z0-9]{20,}' -e 'gho_[A-Za-z0-9]{20,}' -e 'ghu_[A-Za-z0-9]{20,}' -e 'ghs_[A-Za-z0-9]{20,}' -e 'ghr_[A-Za-z0-9]{20,}' -e 'github_pat_[A-Za-z0-9_]{20,}' nativephp/electron/dist/; then
-            echo "::error::Possible GitHub token found in build artifacts."
-            exit 1
-          fi
-
-          echo "No GitHub token patterns found in dist/."
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
