@@ -50,6 +50,9 @@
 @layer theme {
     .dark {
         --color-lumis-canvas: #0c0c0b;
+        --color-lumis-ink: #f3f2f0;
+        --color-lumis-display: #f5f4f2;
+        --color-lumis-icon: #9a9691;
         --color-lumis-panel-surface: #121111;
         --color-lumis-panel-header: #1a1817;
         --color-lumis-panel-line: #32302e;
@@ -68,6 +71,11 @@
 @layer base {
     html {
         font-size: 110%;
+        color-scheme: light;
+    }
+
+    html.dark {
+        color-scheme: dark;
     }
 
     body {
@@ -104,20 +112,30 @@
         -moz-appearance: textfield;
     }
 
-    input.preset-name-input {
+    input.preset-name-input,
+    input.label-text-input {
         border: 1px solid var(--color-lumis-panel-line);
         background: var(--color-lumis-segment-idle);
         color: var(--color-lumis-ink);
         outline: none;
     }
 
-    input.preset-name-input::placeholder {
+    input.label-text-input {
+        height: 2rem;
+        padding: 0 0.625rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
+    }
+
+    input.preset-name-input::placeholder,
+    input.label-text-input::placeholder {
         color: #a3a3a3;
     }
 
-    input.preset-name-input:focus {
+    input.preset-name-input:focus,
+    input.label-text-input:focus {
         border-color: var(--color-lumis-panel-line);
-        background: #ffffff;
+        background: var(--color-lumis-control-bg);
     }
 
     input.slider-value:focus {
