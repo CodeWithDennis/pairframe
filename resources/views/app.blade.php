@@ -211,20 +211,20 @@
                         </template>
                     </div>
 
-                    <div class="mt-3" x-show="layout === 'diagonal'" x-cloak>
+                    <div class="mt-3" x-show="usesSplit" x-cloak>
                         <p class="mb-2 text-xs font-medium text-lumis-ink">Style</p>
                         <div class="mb-3 flex flex-wrap gap-1.5">
-                            <template x-for="option in diagonalStyles" :key="option.id">
+                            <template x-for="option in splitStyles" :key="option.id">
                                 <button
                                     type="button"
                                     class="px-2.5 py-1.5 text-xs font-medium"
-                                    :class="segmentClass(diagonalStyle === option.id)"
-                                    @click="diagonalStyle = option.id"
+                                    :class="segmentClass(splitStyle === option.id)"
+                                    @click="setSplitStyle(option.id)"
                                     x-text="option.label"
                                 ></button>
                             </template>
                         </div>
-                        <div class="mb-3" x-show="showsDiagonalDensity" x-cloak>
+                        <div class="mb-3" x-show="showsEdgeDensity" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Density</label>
                                 <input
@@ -240,23 +240,25 @@
                             </div>
                             <input type="range" min="0.1" max="100" step="0.1" class="w-full" x-model.number="diagonalDensity">
                         </div>
-                        <div class="mb-1 flex items-center justify-between gap-2">
-                            <label class="text-xs font-medium text-lumis-ink">Angle</label>
-                            <div class="flex items-center text-xs text-zinc-400">
-                                <input
-                                    type="number"
-                                    min="-180"
-                                    max="180"
-                                    step="0.5"
-                                    class="slider-value"
-                                    x-model.number="diagonalAngle"
-                                    @blur="clampSlider('diagonalAngle', -180, 180)"
-                                    @keydown.enter="$event.target.blur()"
-                                >
-                                <span>°</span>
+                        <div x-show="layout === 'diagonal'" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Angle</label>
+                                <div class="flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="-180"
+                                        max="180"
+                                        step="0.5"
+                                        class="slider-value"
+                                        x-model.number="diagonalAngle"
+                                        @blur="clampSlider('diagonalAngle', -180, 180)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>°</span>
+                                </div>
                             </div>
+                            <input type="range" min="-180" max="180" step="0.5" class="w-full" x-model.number="diagonalAngle">
                         </div>
-                        <input type="range" min="-180" max="180" step="0.5" class="w-full" x-model.number="diagonalAngle">
                     </div>
 
                     <div class="mt-3" x-show="layout === 'overlap'" x-cloak>

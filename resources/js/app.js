@@ -21,6 +21,7 @@ document.addEventListener('alpine:init', () => {
         diagonalAngle: Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10,
         diagonalStyle: 'straight',
         diagonalDensity: 1.5,
+        splitStyle: 'straight',
         overlapVariant: 'cards',
         overlapOffset: 12,
         overlapShadow: true,
@@ -107,12 +108,14 @@ document.addEventListener('alpine:init', () => {
             { id: 'overlap', label: 'Overlap' },
         ],
 
-        diagonalStyles: [
+        splitStyles: [
             { id: 'straight', label: 'Straight' },
             { id: 'wavy', label: 'Wavy' },
             { id: 'zigzag', label: 'Zigzag' },
             { id: 'scallop', label: 'Scallop' },
             { id: 'soft', label: 'Soft' },
+            { id: 'torn', label: 'Torn' },
+            { id: 'pixel', label: 'Pixel' },
         ],
 
         overlapVariants: [
@@ -148,7 +151,7 @@ document.addEventListener('alpine:init', () => {
                 () => [
                     this.layout,
                     this.diagonalAngle,
-                    this.diagonalStyle,
+                    this.splitStyle,
                     this.diagonalDensity,
                     this.overlapVariant,
                     this.overlapOffset,
@@ -265,12 +268,21 @@ document.addEventListener('alpine:init', () => {
             this.$nextTick(() => this.updateHandle());
         },
 
-        get showsDiagonalDensity() {
-            return this.layout === 'diagonal' && this.diagonalStyle !== 'straight' && this.diagonalStyle !== 'soft';
+        get showsEdgeDensity() {
+            return (
+                this.usesSplit &&
+                this.splitStyle !== 'straight' &&
+                this.splitStyle !== 'soft'
+            );
         },
 
         get usesSplit() {
             return this.layout !== 'overlap';
+        },
+
+        setSplitStyle(id) {
+            this.splitStyle = id;
+            this.diagonalStyle = id;
         },
 
         get showsOverlapOffset() {
@@ -361,8 +373,9 @@ document.addEventListener('alpine:init', () => {
             return {
                 layout: this.layout,
                 diagonalAngle: this.diagonalAngle,
-                diagonalStyle: this.diagonalStyle,
+                diagonalStyle: this.splitStyle,
                 diagonalDensity: this.diagonalDensity,
+                splitStyle: this.splitStyle,
                 overlapVariant: this.overlapVariant,
                 overlapOffset: this.overlapOffset,
                 overlapShadow: this.overlapShadow,
@@ -399,7 +412,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             const layouts = new Set(this.layouts.map((item) => item.id));
-            const styles = new Set(this.diagonalStyles.map((item) => item.id));
+            const styles = new Set(this.splitStyles.map((item) => item.id));
             const overlaps = new Set(this.overlapVariants.map((item) => item.id));
             const backgrounds = new Set(this.backgroundOptions.map((item) => item.id));
 
@@ -409,11 +422,15 @@ document.addEventListener('alpine:init', () => {
             if (Number.isFinite(Number(settings.diagonalAngle))) {
                 this.diagonalAngle = Number(settings.diagonalAngle);
             }
-            if (styles.has(settings.diagonalStyle)) {
-                this.diagonalStyle = settings.diagonalStyle;
-            }
             if (Number.isFinite(Number(settings.diagonalDensity))) {
                 this.diagonalDensity = Math.min(100, Math.max(0.1, Number(settings.diagonalDensity)));
+            }
+            const savedStyle =
+                settings.splitStyle === 'fade'
+                    ? 'soft'
+                    : settings.splitStyle || settings.diagonalStyle;
+            if (styles.has(savedStyle)) {
+                this.setSplitStyle(savedStyle);
             }
             if (overlaps.has(settings.overlapVariant)) {
                 this.overlapVariant = settings.overlapVariant;
@@ -553,8 +570,9 @@ document.addEventListener('alpine:init', () => {
             if (settings.layout) {
                 parts.push(String(settings.layout));
             }
-            if (settings.layout === 'diagonal' && settings.diagonalStyle) {
-                parts.push(String(settings.diagonalStyle));
+            const edgeStyle = settings.splitStyle || settings.diagonalStyle;
+            if (settings.layout !== 'overlap' && edgeStyle && edgeStyle !== 'straight') {
+                parts.push(String(edgeStyle));
             }
             if (settings.layout === 'overlap' && settings.overlapVariant) {
                 parts.push(String(settings.overlapVariant));
@@ -841,11 +859,11 @@ document.addEventListener('alpine:init', () => {
                 height,
                 layoutFamily: this.layout,
                 layoutVariant:
-                    this.layout === 'diagonal'
-                        ? this.diagonalStyle
-                        : this.layout === 'overlap'
-                          ? this.overlapVariant
-                          : 'hard',
+                    this.layout === 'overlap'
+                        ? this.overlapVariant
+                        : this.splitStyle === 'straight'
+                          ? 'hard'
+                          : this.splitStyle,
                 splitPosition: this.splitPosition / 100,
                 softEdge: 0,
                 swapSides: this.swapSides,
