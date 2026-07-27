@@ -92,7 +92,7 @@ Local builds are unsigned unless you configure Apple or Windows code signing. Pr
 
 - Upload two screenshots (PNG, JPG, WebP)
 - Layouts: vertical, horizontal, diagonal, and overlap (cards, side, stack)
-- Diagonal styles: straight, wavy, zigzag, scallop, soft (with density)
+- Split edge styles (vertical / horizontal / diagonal): straight, wavy, zigzag, scallop, soft, torn, pixel (with density)
 - Split position, angle, padding, border radius, and optional shadow on overlap
 - Theme (light / dark / auto), side labels, badge, and swap sides
 - Background patterns with custom colors and density

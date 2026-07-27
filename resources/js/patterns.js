@@ -135,6 +135,14 @@ function blurMask(maskCtx, width, height, softEdge) {
     maskCtx.filter = 'none';
 }
 
+/** Deterministic 0..1 noise so wipe frames do not flicker. */
+function hashNoise(n) {
+    let x = Math.imul(Number(n) ^ 0x9e3779b9, 0x85ebca6b);
+    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+    x = (x ^ (x >>> 16)) >>> 0;
+    return x / 4294967296;
+}
+
 /**
  * Build an alpha mask into maskCtx.
  * Opaque white = show side B. Transparent = keep side A.
@@ -252,6 +260,26 @@ export function paintSplitMask(maskCtx, width, height, options = {}) {
                 maskCtx.lineTo(x, Math.abs(Math.sin(x * freq)) * amp * 1.35);
             }
             fillAngledSide();
+        } else if (style === 'torn') {
+            const segment = Math.max(4, Math.round(interval / 2));
+            const tornAmp = amp * 2.4;
+            maskCtx.beginPath();
+            maskCtx.moveTo(-span, (hashNoise(0) - 0.5) * 2 * tornAmp);
+            for (let x = -span; x <= span; x += segment) {
+                const offset = (hashNoise(Math.round(x * 0.5) + 91) - 0.5) * 2 * tornAmp;
+                maskCtx.lineTo(x, offset);
+            }
+            fillAngledSide();
+        } else if (style === 'pixel') {
+            const step = Math.max(6, Math.round(interval / 2));
+            maskCtx.beginPath();
+            maskCtx.moveTo(-span, 0);
+            for (let x = -span; x <= span; x += step) {
+                const offset = Math.round((hashNoise(Math.floor(x / step) * 13 + 7) - 0.5) * 2 * step * 0.85);
+                maskCtx.lineTo(x, offset);
+                maskCtx.lineTo(x + step, offset);
+            }
+            fillAngledSide();
         } else if (flip) {
             maskCtx.fillRect(-span, -span, span * 2, span);
         } else {
@@ -267,56 +295,226 @@ export function paintSplitMask(maskCtx, width, height, options = {}) {
         }
     };
 
+    const closeAxisMask = (axis) => {
+        if (axis === 'x') {
+            if (flip) {
+                maskCtx.lineTo(0, height);
+                maskCtx.lineTo(0, 0);
+            } else {
+                maskCtx.lineTo(width, height);
+                maskCtx.lineTo(width, 0);
+            }
+        } else if (flip) {
+            maskCtx.lineTo(width, 0);
+            maskCtx.lineTo(0, 0);
+        } else {
+            maskCtx.lineTo(width, height);
+            maskCtx.lineTo(0, height);
+        }
+        maskCtx.closePath();
+        maskCtx.fill();
+    };
+
+    const axisEdgeMetrics = () => {
+        const dens = clamp(density, 0.1, 100);
+        const interval = Math.max(12, 500 / dens + 8);
+        const amp = Math.min(width, height) * (0.008 + Math.min(dens, 100) * 0.00018);
+        return { dens, interval, amp };
+    };
+
+    const paintAxisWavy = (axis, base) => {
+        const { interval, amp } = axisEdgeMetrics();
+        const freq = (Math.PI * 2) / interval;
+        const length = axis === 'x' ? height : width;
+        maskCtx.beginPath();
+        if (axis === 'x') {
+            maskCtx.moveTo(base + Math.sin(0) * amp, 0);
+            for (let y = 0; y <= length; y += 2) {
+                maskCtx.lineTo(base + Math.sin(y * freq) * amp, y);
+            }
+        } else {
+            maskCtx.moveTo(0, base + Math.sin(0) * amp);
+            for (let x = 0; x <= length; x += 2) {
+                maskCtx.lineTo(x, base + Math.sin(x * freq) * amp);
+            }
+        }
+        closeAxisMask(axis);
+    };
+
+    const paintAxisZigzag = (axis, base) => {
+        const { interval, amp } = axisEdgeMetrics();
+        const step = Math.max(10, interval / 2);
+        const length = axis === 'x' ? height : width;
+        let up = true;
+        maskCtx.beginPath();
+        if (axis === 'x') {
+            maskCtx.moveTo(base, 0);
+            for (let y = 0; y <= length; y += step) {
+                maskCtx.lineTo(base + (up ? -amp : amp), Math.min(y, length));
+                up = !up;
+            }
+        } else {
+            maskCtx.moveTo(0, base);
+            for (let x = 0; x <= length; x += step) {
+                maskCtx.lineTo(Math.min(x, length), base + (up ? -amp : amp));
+                up = !up;
+            }
+        }
+        closeAxisMask(axis);
+    };
+
+    const paintAxisScallop = (axis, base) => {
+        const { interval, amp } = axisEdgeMetrics();
+        const freq = (Math.PI * 2) / interval;
+        const length = axis === 'x' ? height : width;
+        maskCtx.beginPath();
+        if (axis === 'x') {
+            maskCtx.moveTo(base, 0);
+            for (let y = 0; y <= length; y += 2) {
+                maskCtx.lineTo(base + Math.abs(Math.sin(y * freq)) * amp * 1.35, y);
+            }
+        } else {
+            maskCtx.moveTo(0, base);
+            for (let x = 0; x <= length; x += 2) {
+                maskCtx.lineTo(x, base + Math.abs(Math.sin(x * freq)) * amp * 1.35);
+            }
+        }
+        closeAxisMask(axis);
+    };
+
+    const paintAxisTorn = (axis, base) => {
+        const { dens } = axisEdgeMetrics();
+        const segment = Math.max(4, Math.round(36 / Math.sqrt(dens) + 3));
+        const amp = Math.min(width, height) * (0.018 + Math.min(dens, 50) * 0.001);
+        const length = axis === 'x' ? height : width;
+        maskCtx.beginPath();
+        if (axis === 'x') {
+            maskCtx.moveTo(base + (hashNoise(0) - 0.5) * 2 * amp, 0);
+            for (let y = segment; y <= length + segment; y += segment) {
+                const ny = Math.min(y, length);
+                const offset = (hashNoise(Math.round(ny * 12.9898) + 3) - 0.5) * 2 * amp;
+                maskCtx.lineTo(base + offset, ny);
+            }
+        } else {
+            maskCtx.moveTo(0, base + (hashNoise(0) - 0.5) * 2 * amp);
+            for (let x = segment; x <= length + segment; x += segment) {
+                const nx = Math.min(x, length);
+                const offset = (hashNoise(Math.round(nx * 12.9898) + 11) - 0.5) * 2 * amp;
+                maskCtx.lineTo(nx, base + offset);
+            }
+        }
+        closeAxisMask(axis);
+    };
+
+    const paintAxisPixel = (axis, base) => {
+        const { dens } = axisEdgeMetrics();
+        const block = Math.max(4, Math.round(42 / Math.sqrt(dens) + 4));
+        const length = axis === 'x' ? height : width;
+        maskCtx.beginPath();
+        if (axis === 'x') {
+            maskCtx.moveTo(base, 0);
+            for (let y = 0; y < length; y += block) {
+                const seed = Math.floor(y / block);
+                const offset = Math.round((hashNoise(seed * 17 + 3) - 0.5) * 2 * block);
+                const y2 = Math.min(length, y + block);
+                maskCtx.lineTo(base + offset, y);
+                maskCtx.lineTo(base + offset, y2);
+            }
+        } else {
+            maskCtx.moveTo(0, base);
+            for (let x = 0; x < length; x += block) {
+                const seed = Math.floor(x / block);
+                const offset = Math.round((hashNoise(seed * 19 + 5) - 0.5) * 2 * block);
+                const x2 = Math.min(length, x + block);
+                maskCtx.lineTo(x, base + offset);
+                maskCtx.lineTo(x2, base + offset);
+            }
+        }
+        closeAxisMask(axis);
+    };
+
+    const paintAxisStyled = (axis, base, style) => {
+        if (style === 'soft' || style === 'fade') {
+            if (axis === 'x') {
+                softVertical(base, Math.max(softEdge, 48), flip);
+            } else {
+                softHorizontal(base, Math.max(softEdge, 48), flip);
+            }
+            return true;
+        }
+        if (style === 'wavy') {
+            paintAxisWavy(axis, base);
+            return true;
+        }
+        if (style === 'zigzag') {
+            paintAxisZigzag(axis, base);
+            return true;
+        }
+        if (style === 'scallop') {
+            paintAxisScallop(axis, base);
+            return true;
+        }
+        if (style === 'torn') {
+            paintAxisTorn(axis, base);
+            return true;
+        }
+        if (style === 'pixel') {
+            paintAxisPixel(axis, base);
+            return true;
+        }
+        return false;
+    };
+
     if (family === 'vertical') {
         const x = split * width;
-        if (variant === 'soft') {
-            softVertical(x, Math.max(softEdge, 48), flip);
-        } else if (variant === 'blinds') {
-            const strip = Math.max(8, density * 0.7);
-            const start = flip ? 0 : x;
-            const end = flip ? x : width;
-            for (let sx = start; sx < end; sx += strip * 2) {
-                maskCtx.fillRect(sx, 0, strip, height);
+        if (!paintAxisStyled('x', x, variant)) {
+            if (variant === 'blinds') {
+                const strip = Math.max(8, density * 0.7);
+                const start = flip ? 0 : x;
+                const end = flip ? x : width;
+                for (let sx = start; sx < end; sx += strip * 2) {
+                    maskCtx.fillRect(sx, 0, strip, height);
+                }
+                if (softEdge > 0) {
+                    blurMask(maskCtx, width, height, softEdge);
+                }
+            } else if (variant === 'band') {
+                const band = Math.max(width * 0.12, density * 4);
+                const left = x - band / 2;
+                maskCtx.fillRect(left, 0, band, height);
+                blurMask(maskCtx, width, height, Math.max(softEdge, 24));
+            } else if (softEdge > 0) {
+                softVertical(x, softEdge, flip);
+            } else if (flip) {
+                maskCtx.fillRect(0, 0, x, height);
+            } else {
+                maskCtx.fillRect(x, 0, width - x, height);
             }
-            if (softEdge > 0) {
-                blurMask(maskCtx, width, height, softEdge);
-            }
-        } else if (variant === 'band') {
-            const band = Math.max(width * 0.12, density * 4);
-            const left = x - band / 2;
-            maskCtx.fillRect(left, 0, band, height);
-            blurMask(maskCtx, width, height, Math.max(softEdge, 24));
-        } else if (softEdge > 0) {
-            softVertical(x, softEdge, flip);
-        } else if (flip) {
-            maskCtx.fillRect(0, 0, x, height);
-        } else {
-            maskCtx.fillRect(x, 0, width - x, height);
         }
     } else if (family === 'horizontal') {
         const y = split * height;
-        if (variant === 'soft') {
-            softHorizontal(y, Math.max(softEdge, 48), flip);
-        } else if (variant === 'blinds') {
-            const strip = Math.max(8, density * 0.7);
-            const start = flip ? 0 : y;
-            const end = flip ? y : height;
-            for (let sy = start; sy < end; sy += strip * 2) {
-                maskCtx.fillRect(0, sy, width, strip);
+        if (!paintAxisStyled('y', y, variant)) {
+            if (variant === 'blinds') {
+                const strip = Math.max(8, density * 0.7);
+                const start = flip ? 0 : y;
+                const end = flip ? y : height;
+                for (let sy = start; sy < end; sy += strip * 2) {
+                    maskCtx.fillRect(0, sy, width, strip);
+                }
+                if (softEdge > 0) {
+                    blurMask(maskCtx, width, height, softEdge);
+                }
+            } else if (variant === 'band') {
+                const band = Math.max(height * 0.12, density * 4);
+                maskCtx.fillRect(0, y - band / 2, width, band);
+                blurMask(maskCtx, width, height, Math.max(softEdge, 24));
+            } else if (softEdge > 0) {
+                softHorizontal(y, softEdge, flip);
+            } else if (flip) {
+                maskCtx.fillRect(0, 0, width, y);
+            } else {
+                maskCtx.fillRect(0, y, width, height - y);
             }
-            if (softEdge > 0) {
-                blurMask(maskCtx, width, height, softEdge);
-            }
-        } else if (variant === 'band') {
-            const band = Math.max(height * 0.12, density * 4);
-            maskCtx.fillRect(0, y - band / 2, width, band);
-            blurMask(maskCtx, width, height, Math.max(softEdge, 24));
-        } else if (softEdge > 0) {
-            softHorizontal(y, softEdge, flip);
-        } else if (flip) {
-            maskCtx.fillRect(0, 0, width, y);
-        } else {
-            maskCtx.fillRect(0, y, width, height - y);
         }
     } else if (family === 'diagonal') {
         paintAngledSplit(diagonalAngle, variant || 'straight');
