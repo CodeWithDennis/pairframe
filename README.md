@@ -1,6 +1,6 @@
 # Pairframe
 
-NativePHP desktop app to compose two screenshots into split or overlap thumbnails, with background patterns and PNG, JPG, or wipe-video export.
+NativePHP desktop app to compose two screenshots into split or overlap thumbnails, with background patterns and PNG, JPG, or transition-video export.
 
 ![Pairframe desktop app with diagonal wavy split preview and video export selected](docs/pairframe.png)
 
@@ -97,4 +97,4 @@ Local builds are unsigned unless you configure Apple or Windows code signing. Pr
 - Theme (light / dark / auto), side labels, badge, and swap sides
 - Background patterns with custom colors and density
 - Save / load settings presets (images are not stored)
-- Export PNG or JPG at optional scale (1×, 1.5×, 2×), or wipe video (MP4 / WebM)
+- Export PNG or JPG at optional scale (1×, 1.5×, 2×), or transition video (wipe, dissolve, push, iris, reveal → MP4 / WebM)

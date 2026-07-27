@@ -38,7 +38,7 @@ export function pickVideoMimeType(videoContainer) {
 }
 
 /**
- * Record a wipe transition A→B (or reverse) from the compositor canvas.
+ * Record an A→B (or reverse) transition from the compositor canvas.
  *
  * @param {object} params
  * @param {number} params.width
@@ -47,17 +47,19 @@ export function pickVideoMimeType(videoContainer) {
  * @param {number} params.videoFps
  * @param {number} params.videoDuration
  * @param {boolean} params.videoReverse
- * @param {{ render: Function, getCanvas: Function }} params.compositor
+ * @param {string} [params.videoTransition]
+ * @param {{ renderVideoFrame: Function, getCanvas: Function }} params.compositor
  * @param {(width: number, height: number) => object} params.buildOptions
  * @param {(message: string) => void} [params.onProgress]
  */
-export async function recordWipeVideo({
+export async function recordTransitionVideo({
     width,
     height,
     videoContainer,
     videoFps,
     videoDuration,
     videoReverse,
+    videoTransition = 'wipe',
     compositor,
     buildOptions,
     onProgress,
@@ -77,11 +79,11 @@ export async function recordWipeVideo({
     const durationSec = videoDuration;
     const frameCount = Math.max(2, Math.round(fps * durationSec));
     const frameDelay = 1000 / fps;
+    const transition = videoTransition || 'wipe';
 
-    const renderFrame = (split01) => {
+    const renderFrame = (progress) => {
         const options = buildOptions(width, height);
-        options.splitPosition = clamp(split01, 0, 1);
-        compositor.render(options);
+        compositor.renderVideoFrame(options, transition, clamp(progress, 0, 1));
     };
 
     renderFrame(videoReverse ? 1 : 0);
@@ -114,8 +116,8 @@ export async function recordWipeVideo({
 
     for (let i = 0; i <= frameCount; i++) {
         const t = i / frameCount;
-        const split = videoReverse ? 1 - t : t;
-        renderFrame(split);
+        const progress = videoReverse ? 1 - t : t;
+        renderFrame(progress);
         if (typeof track.requestFrame === 'function') {
             track.requestFrame();
         }
@@ -134,4 +136,9 @@ export async function recordWipeVideo({
     }
 
     return { blob, extension, label };
+}
+
+/** @deprecated Use recordTransitionVideo */
+export async function recordWipeVideo(params) {
+    return recordTransitionVideo({ ...params, videoTransition: params.videoTransition || 'wipe' });
 }
