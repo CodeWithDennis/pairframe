@@ -3,6 +3,16 @@ import { createCompositor } from './compositor.js';
 
 const PRESETS_STORAGE_KEY = 'pairframe.presets';
 const THEME_STORAGE_KEY = 'pairframe.theme';
+const PANELS_STORAGE_KEY = 'pairframe.panels.v2';
+const DEFAULT_PANELS = {
+    layout: true,
+    split: true,
+    adjust: false,
+    labels: false,
+    background: true,
+    overlay: false,
+    export: true,
+};
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('pairframe', () => ({
@@ -50,6 +60,23 @@ document.addEventListener('alpine:init', () => {
         backgroundBg: '#FAFAFA',
         backgroundFg: '#E5E5E5',
         backgroundDensity: 24,
+        backgroundPerSide: false,
+        backgroundEditSide: 'a',
+        backgroundBType: 'dots',
+        backgroundBBg: '#FAFAFA',
+        backgroundBFg: '#E5E5E5',
+        backgroundBDensity: 24,
+
+        overlayType: 'none',
+        overlayColor: '#171717',
+        overlayOpacity: 25,
+        overlayDensity: 24,
+        overlayPerSide: false,
+        overlayEditSide: 'a',
+        overlayBType: 'none',
+        overlayBColor: '#171717',
+        overlayBOpacity: 25,
+        overlayBDensity: 24,
 
         exportScale: '1',
         exportFormat: 'png',
@@ -84,6 +111,8 @@ document.addEventListener('alpine:init', () => {
             { id: 'iris', label: 'Iris' },
             { id: 'reveal', label: 'Reveal' },
         ],
+
+        panelOpen: { ...DEFAULT_PANELS },
 
         presets: [],
         presetName: '',
@@ -134,6 +163,16 @@ document.addEventListener('alpine:init', () => {
             { id: 'noise', label: 'Noise' },
         ],
 
+        overlayOptions: [
+            { id: 'none', label: 'None' },
+            { id: 'dots', label: 'Dots' },
+            { id: 'grid', label: 'Grid' },
+            { id: 'stripes', label: 'Stripes' },
+            { id: 'diagonal', label: 'Diagonal' },
+            { id: 'chevron', label: 'Chevron' },
+            { id: 'noise', label: 'Noise' },
+        ],
+
         init() {
             this.compositor = createCompositor();
             const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
@@ -146,6 +185,7 @@ document.addEventListener('alpine:init', () => {
                 }
             };
             this._themeMedia.addEventListener('change', this._onThemeMedia);
+            this.loadPanels();
             this.loadPresets();
             this.$watch(
                 () => [
@@ -172,6 +212,20 @@ document.addEventListener('alpine:init', () => {
                     this.backgroundBg,
                     this.backgroundFg,
                     this.backgroundDensity,
+                    this.backgroundPerSide,
+                    this.backgroundBType,
+                    this.backgroundBBg,
+                    this.backgroundBFg,
+                    this.backgroundBDensity,
+                    this.overlayType,
+                    this.overlayColor,
+                    this.overlayOpacity,
+                    this.overlayDensity,
+                    this.overlayPerSide,
+                    this.overlayBType,
+                    this.overlayBColor,
+                    this.overlayBOpacity,
+                    this.overlayBDensity,
                     this.baseWidth,
                     this.baseHeight,
                     this.imageA,
@@ -285,6 +339,31 @@ document.addEventListener('alpine:init', () => {
             this.diagonalStyle = id;
         },
 
+        loadPanels() {
+            try {
+                const raw = localStorage.getItem(PANELS_STORAGE_KEY);
+                const parsed = raw ? JSON.parse(raw) : null;
+                if (!parsed || typeof parsed !== 'object') {
+                    return;
+                }
+                for (const key of Object.keys(DEFAULT_PANELS)) {
+                    if (typeof parsed[key] === 'boolean') {
+                        this.panelOpen[key] = parsed[key];
+                    }
+                }
+            } catch {
+                // keep defaults
+            }
+        },
+
+        togglePanel(id) {
+            if (!Object.hasOwn(this.panelOpen, id)) {
+                return;
+            }
+            this.panelOpen[id] = !this.panelOpen[id];
+            localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(this.panelOpen));
+        },
+
         get showsOverlapOffset() {
             return this.layout === 'overlap' && this.overlapVariant !== 'side';
         },
@@ -395,6 +474,20 @@ document.addEventListener('alpine:init', () => {
                 backgroundBg: this.backgroundBg,
                 backgroundFg: this.backgroundFg,
                 backgroundDensity: this.backgroundDensity,
+                backgroundPerSide: this.backgroundPerSide,
+                backgroundBType: this.backgroundBType,
+                backgroundBBg: this.backgroundBBg,
+                backgroundBFg: this.backgroundBFg,
+                backgroundBDensity: this.backgroundBDensity,
+                overlayType: this.overlayType,
+                overlayColor: this.overlayColor,
+                overlayOpacity: this.overlayOpacity,
+                overlayDensity: this.overlayDensity,
+                overlayPerSide: this.overlayPerSide,
+                overlayBType: this.overlayBType,
+                overlayBColor: this.overlayBColor,
+                overlayBOpacity: this.overlayBOpacity,
+                overlayBDensity: this.overlayBDensity,
                 exportScale: this.exportScale,
                 exportFormat: this.exportFormat,
                 jpgQuality: this.jpgQuality,
@@ -415,6 +508,7 @@ document.addEventListener('alpine:init', () => {
             const styles = new Set(this.splitStyles.map((item) => item.id));
             const overlaps = new Set(this.overlapVariants.map((item) => item.id));
             const backgrounds = new Set(this.backgroundOptions.map((item) => item.id));
+            const overlays = new Set(this.overlayOptions.map((item) => item.id));
 
             if (layouts.has(settings.layout)) {
                 this.layout = settings.layout;
@@ -487,6 +581,64 @@ document.addEventListener('alpine:init', () => {
             }
             if (Number.isFinite(Number(settings.backgroundDensity))) {
                 this.backgroundDensity = Math.min(80, Math.max(8, Number(settings.backgroundDensity)));
+            }
+            this.backgroundPerSide = Boolean(settings.backgroundPerSide);
+            if (backgrounds.has(settings.backgroundBType)) {
+                this.backgroundBType = settings.backgroundBType;
+            } else if (this.backgroundPerSide) {
+                this.backgroundBType = this.backgroundType;
+                this.backgroundBBg = this.backgroundBg;
+                this.backgroundBFg = this.backgroundFg;
+                this.backgroundBDensity = this.backgroundDensity;
+            }
+            if (typeof settings.backgroundBBg === 'string') {
+                this.backgroundBBg = settings.backgroundBBg;
+            }
+            if (typeof settings.backgroundBFg === 'string') {
+                this.backgroundBFg = settings.backgroundBFg;
+            }
+            if (Number.isFinite(Number(settings.backgroundBDensity))) {
+                this.backgroundBDensity = Math.min(80, Math.max(8, Number(settings.backgroundBDensity)));
+            }
+            if (!this.backgroundPerSide) {
+                this.backgroundEditSide = 'a';
+            }
+            if (settings.overlayType === 'solid') {
+                this.overlayType = 'none';
+            } else if (overlays.has(settings.overlayType)) {
+                this.overlayType = settings.overlayType;
+            }
+            if (typeof settings.overlayColor === 'string') {
+                this.overlayColor = settings.overlayColor;
+            }
+            if (Number.isFinite(Number(settings.overlayOpacity))) {
+                this.overlayOpacity = Math.min(80, Math.max(5, Number(settings.overlayOpacity)));
+            }
+            if (Number.isFinite(Number(settings.overlayDensity))) {
+                this.overlayDensity = Math.min(80, Math.max(8, Number(settings.overlayDensity)));
+            }
+            this.overlayPerSide = Boolean(settings.overlayPerSide);
+            if (settings.overlayBType === 'solid') {
+                this.overlayBType = 'none';
+            } else if (overlays.has(settings.overlayBType)) {
+                this.overlayBType = settings.overlayBType;
+            } else if (this.overlayPerSide) {
+                this.overlayBType = this.overlayType;
+                this.overlayBColor = this.overlayColor;
+                this.overlayBOpacity = this.overlayOpacity;
+                this.overlayBDensity = this.overlayDensity;
+            }
+            if (typeof settings.overlayBColor === 'string') {
+                this.overlayBColor = settings.overlayBColor;
+            }
+            if (Number.isFinite(Number(settings.overlayBOpacity))) {
+                this.overlayBOpacity = Math.min(80, Math.max(5, Number(settings.overlayBOpacity)));
+            }
+            if (Number.isFinite(Number(settings.overlayBDensity))) {
+                this.overlayBDensity = Math.min(80, Math.max(8, Number(settings.overlayBDensity)));
+            }
+            if (!this.overlayPerSide) {
+                this.overlayEditSide = 'a';
             }
             if (['1', '1.5', '2'].includes(String(settings.exportScale))) {
                 this.exportScale = String(settings.exportScale);
@@ -590,7 +742,20 @@ document.addEventListener('alpine:init', () => {
                 parts.push('labels');
             }
             if (settings.backgroundType) {
-                parts.push(String(settings.backgroundType));
+                parts.push(
+                    settings.backgroundPerSide && settings.backgroundBType
+                        ? `${settings.backgroundType}/${settings.backgroundBType}`
+                        : String(settings.backgroundType),
+                );
+            }
+            if (settings.overlayPerSide) {
+                const a = settings.overlayType && settings.overlayType !== 'none' ? settings.overlayType : 'none';
+                const b = settings.overlayBType && settings.overlayBType !== 'none' ? settings.overlayBType : 'none';
+                if (a !== 'none' || b !== 'none') {
+                    parts.push(`overlay ${a}/${b}`);
+                }
+            } else if (settings.overlayType && settings.overlayType !== 'none') {
+                parts.push(`overlay ${settings.overlayType}`);
             }
             return parts.join(' · ');
         },
@@ -893,7 +1058,187 @@ document.addEventListener('alpine:init', () => {
                     fg: this.backgroundFg,
                     density: Number(this.backgroundDensity) || 24,
                 },
+                backgroundB: this.backgroundPerSide
+                    ? {
+                          type: this.backgroundBType,
+                          bg: this.backgroundBBg,
+                          fg: this.backgroundBFg,
+                          density: Number(this.backgroundBDensity) || 24,
+                      }
+                    : null,
+                overlay: {
+                    type: this.overlayType,
+                    color: this.overlayColor,
+                    opacity: Number(this.overlayOpacity) || 25,
+                    density: Number(this.overlayDensity) || 24,
+                },
+                overlayB: this.overlayPerSide
+                    ? {
+                          type: this.overlayBType,
+                          color: this.overlayBColor,
+                          opacity: Number(this.overlayBOpacity) || 25,
+                          density: Number(this.overlayBDensity) || 24,
+                      }
+                    : null,
             };
+        },
+
+        get backgroundSummary() {
+            if (this.backgroundPerSide) {
+                return `${this.backgroundType} / ${this.backgroundBType}`;
+            }
+            return this.backgroundType;
+        },
+
+        get overlaySummary() {
+            if (this.overlayPerSide) {
+                return `${this.overlayType} / ${this.overlayBType}`;
+            }
+            return this.overlayType;
+        },
+
+        get editingBackgroundB() {
+            return this.backgroundPerSide && this.backgroundEditSide === 'b';
+        },
+
+        get editingOverlayB() {
+            return this.overlayPerSide && this.overlayEditSide === 'b';
+        },
+
+        get activeBackgroundType() {
+            return this.editingBackgroundB ? this.backgroundBType : this.backgroundType;
+        },
+
+        set activeBackgroundType(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBType = value;
+            } else {
+                this.backgroundType = value;
+            }
+        },
+
+        get activeBackgroundBg() {
+            return this.editingBackgroundB ? this.backgroundBBg : this.backgroundBg;
+        },
+
+        set activeBackgroundBg(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBBg = value;
+            } else {
+                this.backgroundBg = value;
+            }
+        },
+
+        get activeBackgroundFg() {
+            return this.editingBackgroundB ? this.backgroundBFg : this.backgroundFg;
+        },
+
+        set activeBackgroundFg(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBFg = value;
+            } else {
+                this.backgroundFg = value;
+            }
+        },
+
+        get activeBackgroundDensity() {
+            return this.editingBackgroundB ? this.backgroundBDensity : this.backgroundDensity;
+        },
+
+        set activeBackgroundDensity(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBDensity = value;
+            } else {
+                this.backgroundDensity = value;
+            }
+        },
+
+        get activeOverlayType() {
+            return this.editingOverlayB ? this.overlayBType : this.overlayType;
+        },
+
+        set activeOverlayType(value) {
+            if (this.editingOverlayB) {
+                this.overlayBType = value;
+            } else {
+                this.overlayType = value;
+            }
+        },
+
+        get activeOverlayColor() {
+            return this.editingOverlayB ? this.overlayBColor : this.overlayColor;
+        },
+
+        set activeOverlayColor(value) {
+            if (this.editingOverlayB) {
+                this.overlayBColor = value;
+            } else {
+                this.overlayColor = value;
+            }
+        },
+
+        get activeOverlayOpacity() {
+            return this.editingOverlayB ? this.overlayBOpacity : this.overlayOpacity;
+        },
+
+        set activeOverlayOpacity(value) {
+            if (this.editingOverlayB) {
+                this.overlayBOpacity = value;
+            } else {
+                this.overlayOpacity = value;
+            }
+        },
+
+        get activeOverlayDensity() {
+            return this.editingOverlayB ? this.overlayBDensity : this.overlayDensity;
+        },
+
+        set activeOverlayDensity(value) {
+            if (this.editingOverlayB) {
+                this.overlayBDensity = value;
+            } else {
+                this.overlayDensity = value;
+            }
+        },
+
+        setBackgroundPerSide(enabled) {
+            const on = Boolean(enabled);
+            if (on && !this.backgroundPerSide) {
+                this.backgroundBType = this.backgroundType;
+                this.backgroundBBg = this.backgroundBg;
+                this.backgroundBFg = this.backgroundFg;
+                this.backgroundBDensity = this.backgroundDensity;
+            }
+            this.backgroundPerSide = on;
+            if (!on) {
+                this.backgroundEditSide = 'a';
+            }
+        },
+
+        setOverlayPerSide(enabled) {
+            const on = Boolean(enabled);
+            if (on && !this.overlayPerSide) {
+                this.overlayBType = this.overlayType;
+                this.overlayBColor = this.overlayColor;
+                this.overlayBOpacity = this.overlayOpacity;
+                this.overlayBDensity = this.overlayDensity;
+            }
+            this.overlayPerSide = on;
+            if (!on) {
+                this.overlayEditSide = 'a';
+            }
+        },
+
+        clampActiveBackgroundDensity() {
+            this.clampSlider(this.editingBackgroundB ? 'backgroundBDensity' : 'backgroundDensity', 8, 80);
+        },
+
+        clampActiveOverlayOpacity() {
+            this.clampSlider(this.editingOverlayB ? 'overlayBOpacity' : 'overlayOpacity', 5, 80);
+        },
+
+        clampActiveOverlayDensity() {
+            this.clampSlider(this.editingOverlayB ? 'overlayBDensity' : 'overlayDensity', 8, 80);
         },
 
         render() {

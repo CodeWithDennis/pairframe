@@ -95,6 +95,8 @@ Local builds are unsigned unless you configure Apple or Windows code signing. Pr
 - Split edge styles (vertical / horizontal / diagonal): straight, wavy, zigzag, scallop, soft, torn, pixel (with density)
 - Split position, angle, padding, border radius, and optional shadow on overlap
 - Theme (light / dark / auto), side labels, badge, and swap sides
-- Background patterns with custom colors and density
+- Background patterns with custom colors and density (optional per-side A/B)
+- Overlay pattern marks only (dots, grid, and more) with color, opacity, and density — no base fill; optional per-side A/B
+- Collapsible sidebar groups with scrollable panels
 - Save / load settings presets (images are not stored)
 - Export PNG or JPG at optional scale (1×, 1.5×, 2×), or transition video (wipe, dissolve, push, iris, reveal → MP4 / WebM)

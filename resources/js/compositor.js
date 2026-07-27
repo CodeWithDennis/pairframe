@@ -1,4 +1,4 @@
-import { paintBackground, paintSplitMask } from './patterns.js';
+import { paintBackground, paintOverlay, paintSplitMask } from './patterns.js';
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -85,12 +85,17 @@ export function createCompositor() {
     const frameACtx = frameACanvas.getContext('2d', { willReadFrequently: false });
     const frameBCanvas = document.createElement('canvas');
     const frameBCtx = frameBCanvas.getContext('2d', { willReadFrequently: false });
+    const overlayCanvas = document.createElement('canvas');
+    const overlayCtx = overlayCanvas.getContext('2d', { willReadFrequently: false });
+    const bgBCanvas = document.createElement('canvas');
+    const bgBCtx = bgBCanvas.getContext('2d', { willReadFrequently: false });
 
     let lastOptions = null;
     let bgKey = '';
     let sideAKey = '';
     let sideBKey = '';
     let maskKey = '';
+    let overlayKey = '';
     let transitionFrameKey = '';
 
     function resolveSides(options) {
@@ -102,24 +107,156 @@ export function createCompositor() {
         return { sideA: light, sideB: dark };
     }
 
-    function blitBackground(targetCtx, width, height, background) {
+    function backgroundLayerKey(layer) {
+        const bg = layer || {};
+        return [bg.type || 'solid', bg.bg || '', bg.fg || '', Number(bg.density) || 0].join(':');
+    }
+
+    function overlayLayerKey(layer) {
+        const ov = layer || {};
+        return [ov.type || 'none', ov.color || '', Number(ov.opacity) || 0, Number(ov.density) || 0].join(':');
+    }
+
+    function splitMaskOptions(options) {
+        return {
+            layoutFamily: options.layoutFamily || options.layout,
+            layoutVariant: options.layoutVariant,
+            splitPosition: options.splitPosition,
+            softEdge: options.softEdge,
+            flipDirection: options.flipDirection,
+            invertMask: options.invertMask,
+            maskDensity: options.maskDensity,
+            diagonalAngle: options.diagonalAngle,
+        };
+    }
+
+    function ensureLayerSideBMask(width, height, options) {
+        const family = options.layoutFamily || options.layout;
+        if (family === 'overlap') {
+            const flip = Boolean(options.flipDirection) || Boolean(options.swapSides);
+            const key = `overlap-half|${width}|${height}|${flip ? 1 : 0}`;
+            if (maskKey === key && maskCanvas.width === width && maskCanvas.height === height) {
+                return maskCanvas;
+            }
+            ensureCanvasSize(maskCanvas, width, height);
+            maskCtx.clearRect(0, 0, width, height);
+            maskCtx.fillStyle = '#ffffff';
+            if (flip) {
+                maskCtx.fillRect(0, 0, Math.ceil(width / 2), height);
+            } else {
+                maskCtx.fillRect(Math.floor(width / 2), 0, Math.ceil(width / 2), height);
+            }
+            maskKey = key;
+            return maskCanvas;
+        }
+
+        ensureMask(width, height, splitMaskOptions(options));
+        return maskCanvas;
+    }
+
+    function blitBackground(targetCtx, width, height, background, backgroundB, options) {
         const bg = background || { type: 'solid', bg: '#FAFAFA' };
-        const key = [
-            width,
-            height,
-            bg.type || 'solid',
-            bg.bg || '',
-            bg.fg || '',
-            Number(bg.density) || 0,
-        ].join('|');
+        const hasB = Boolean(backgroundB && typeof backgroundB === 'object');
+        const maskPart = hasB
+            ? [
+                  options?.layoutFamily || options?.layout || '',
+                  options?.layoutVariant || '',
+                  Number(options?.splitPosition) || 0,
+                  Number(options?.softEdge) || 0,
+                  Boolean(options?.flipDirection) ? 1 : 0,
+                  Boolean(options?.invertMask) ? 1 : 0,
+                  Boolean(options?.swapSides) ? 1 : 0,
+                  Number(options?.maskDensity) || 0,
+                  Number(options?.diagonalAngle) || 0,
+              ].join('|')
+            : '';
+        const key = [width, height, backgroundLayerKey(bg), hasB ? backgroundLayerKey(backgroundB) : '', maskPart].join(
+            '|',
+        );
 
         if (bgKey !== key) {
             ensureCanvasSize(bgCanvas, width, height);
             paintBackground(bgCtx, width, height, bg);
+
+            if (hasB) {
+                ensureCanvasSize(bgBCanvas, width, height);
+                paintBackground(bgBCtx, width, height, backgroundB);
+                const mask = ensureLayerSideBMask(width, height, options || {});
+                bgBCtx.globalCompositeOperation = 'destination-in';
+                bgBCtx.drawImage(mask, 0, 0);
+                bgBCtx.globalCompositeOperation = 'source-over';
+                bgCtx.drawImage(bgBCanvas, 0, 0);
+            }
+
             bgKey = key;
         }
 
         targetCtx.drawImage(bgCanvas, 0, 0);
+    }
+
+    function blitOverlay(targetCtx, width, height, overlay, overlayB, options) {
+        const layerA = overlay || { type: 'none' };
+        const layerB = overlayB && typeof overlayB === 'object' ? overlayB : null;
+        const typeA = layerA.type || 'none';
+        const typeB = layerB ? layerB.type || 'none' : 'none';
+        const hasB = Boolean(layerB);
+        const activeA = typeA && typeA !== 'none';
+        const activeB = hasB && typeB && typeB !== 'none';
+
+        if (!activeA && !activeB) {
+            return;
+        }
+
+        if (!hasB) {
+            const key = [width, height, overlayLayerKey(layerA)].join('|');
+            if (overlayKey !== key) {
+                clearCanvas(overlayCtx, overlayCanvas, width, height);
+                paintOverlay(overlayCtx, width, height, layerA);
+                overlayKey = key;
+            }
+            targetCtx.drawImage(overlayCanvas, 0, 0);
+            return;
+        }
+
+        const maskPart = [
+            options?.layoutFamily || options?.layout || '',
+            options?.layoutVariant || '',
+            Number(options?.splitPosition) || 0,
+            Number(options?.softEdge) || 0,
+            Boolean(options?.flipDirection) ? 1 : 0,
+            Boolean(options?.invertMask) ? 1 : 0,
+            Boolean(options?.swapSides) ? 1 : 0,
+            Number(options?.maskDensity) || 0,
+            Number(options?.diagonalAngle) || 0,
+        ].join('|');
+        const key = [width, height, overlayLayerKey(layerA), overlayLayerKey(layerB), maskPart].join('|');
+
+        if (overlayKey !== key) {
+            clearCanvas(overlayCtx, overlayCanvas, width, height);
+            const mask = ensureLayerSideBMask(width, height, options || {});
+
+            if (activeA) {
+                clearCanvas(sideCtx, sideCanvas, width, height);
+                paintOverlay(sideCtx, width, height, layerA);
+                sideCtx.globalCompositeOperation = 'destination-out';
+                sideCtx.drawImage(mask, 0, 0);
+                sideCtx.globalCompositeOperation = 'source-over';
+                overlayCtx.drawImage(sideCanvas, 0, 0);
+            }
+
+            if (activeB) {
+                clearCanvas(sideCtx, sideCanvas, width, height);
+                paintOverlay(sideCtx, width, height, layerB);
+                sideCtx.globalCompositeOperation = 'destination-in';
+                sideCtx.drawImage(mask, 0, 0);
+                sideCtx.globalCompositeOperation = 'source-over';
+                overlayCtx.drawImage(sideCanvas, 0, 0);
+            }
+
+            overlayKey = key;
+        }
+
+        targetCtx.drawImage(overlayCanvas, 0, 0);
     }
 
     function imageCacheKey(image, width, height, fitMode) {
@@ -171,7 +308,7 @@ export function createCompositor() {
     }
 
     function renderOverlap(options, width, height, sideA, sideB) {
-        blitBackground(ctx, width, height, options.background);
+        blitBackground(ctx, width, height, options.background, options.backgroundB, options);
 
         const variant = options.layoutVariant || 'cards';
         const offsetXRaw = Number(options.overlapOffsetX);
@@ -272,7 +409,7 @@ export function createCompositor() {
     }
 
     function renderSplit(options, width, height, sideA, sideB) {
-        blitBackground(ctx, width, height, options.background);
+        blitBackground(ctx, width, height, options.background, options.backgroundB, options);
 
         const content = contentPadding(width, height, options);
         const radiusPct = clamp(Number(options.imageRadius) || 0, 0, 50) / 100;
@@ -298,17 +435,7 @@ export function createCompositor() {
             fitMode,
         );
 
-        const maskOptions = {
-            layoutFamily: options.layoutFamily || options.layout,
-            layoutVariant: options.layoutVariant,
-            splitPosition: options.splitPosition,
-            softEdge: options.softEdge,
-            flipDirection: options.flipDirection,
-            invertMask: options.invertMask,
-            maskDensity: options.maskDensity,
-            diagonalAngle: options.diagonalAngle,
-        };
-        ensureMask(content.width, content.height, maskOptions);
+        ensureMask(content.width, content.height, splitMaskOptions(options));
 
         ctx.save();
         if (radius > 0) {
@@ -340,7 +467,14 @@ export function createCompositor() {
         const { sideA, sideB } = resolveSides(options);
 
         if (!sideA && !sideB) {
-            blitBackground(ctx, width, height, options.background || { type: 'solid', bg: '#FAFAFA' });
+            blitBackground(
+                ctx,
+                width,
+                height,
+                options.background || { type: 'solid', bg: '#FAFAFA' },
+                options.backgroundB,
+                options,
+            );
             ctx.fillStyle = '#A3A3A3';
             ctx.font = '500 18px Inter, sans-serif';
             ctx.textAlign = 'center';
@@ -355,6 +489,7 @@ export function createCompositor() {
             renderSplit(options, width, height, sideA || sideB, sideB || sideA);
         }
 
+        blitOverlay(ctx, width, height, options.overlay, options.overlayB, options);
         paintLabels(ctx, width, height, options);
 
         return canvas;
@@ -493,7 +628,6 @@ export function createCompositor() {
     }
 
     function transitionFramesCacheKey(options, width, height) {
-        const bg = options.background || {};
         const light = options.lightImage;
         const dark = options.darkImage;
         return [
@@ -509,10 +643,10 @@ export function createCompositor() {
             Number(options.imagePadding) || 0,
             Number(options.imageRadius) || 0,
             options.fitMode || 'cover',
-            bg.type || '',
-            bg.bg || '',
-            bg.fg || '',
-            Number(bg.density) || 0,
+            backgroundLayerKey(options.background),
+            options.backgroundB ? backgroundLayerKey(options.backgroundB) : '',
+            overlayLayerKey(options.overlay),
+            options.overlayB ? overlayLayerKey(options.overlayB) : '',
             light?.src || '',
             light?.naturalWidth || light?.width || 0,
             light?.naturalHeight || light?.height || 0,

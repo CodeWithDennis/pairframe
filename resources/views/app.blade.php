@@ -86,7 +86,7 @@
         }
     </style>
 </head>
-<body class="h-dvh overflow-hidden bg-lumis-canvas font-sans font-normal text-lumis-ink" x-data="pairframe">
+<body class="h-full overflow-hidden bg-lumis-canvas font-sans font-normal text-lumis-ink" x-data="pairframe">
     {{-- Shown before Vite/Alpine are ready --}}
     <div id="boot-screen" aria-live="polite" aria-busy="true">
         <svg class="boot-mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
@@ -105,7 +105,7 @@
         <div class="boot-bar" aria-hidden="true"><i></i></div>
     </div>
 
-    <div class="flex h-dvh flex-col">
+    <div class="flex h-full flex-col">
         {{-- Header --}}
         <header class="flex h-14 shrink-0 items-center justify-between border-b border-lumis-panel-line bg-lumis-panel-surface px-5">
             <a href="/" class="group flex items-center gap-2.5 text-lumis-ink" aria-label="Pairframe">
@@ -194,11 +194,22 @@
         </header>
 
         {{-- Workspace: left tools | preview | right tools --}}
-        <div class="flex min-h-0 flex-1">
+        <div class="relative min-h-0 flex-1">
+            <div class="absolute inset-0 flex overflow-hidden">
             {{-- Left: layout + split + switches --}}
-            <aside class="flex w-[240px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-lumis-panel-line bg-lumis-panel-surface px-4 py-4">
-                <section>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Layout</h2>
+            <aside class="flex h-full w-[240px] shrink-0 flex-col border-r border-lumis-panel-line bg-lumis-panel-surface">
+                <div class="sidebar-scroll">
+                <section class="sidebar-group" :class="panelOpen.layout ? 'is-open' : 'is-collapsed'">
+                    <button
+                        type="button"
+                        class="sidebar-group-toggle"
+                        @click="togglePanel('layout')"
+                        :aria-expanded="panelOpen.layout.toString()"
+                    >
+                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Layout</h2>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.layout && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="sidebar-group-body" x-show="panelOpen.layout" x-cloak>
                     <div class="flex flex-wrap gap-1.5">
                         <template x-for="option in layouts" :key="option.id">
                             <button
@@ -302,10 +313,21 @@
                             <input type="range" min="0" max="40" step="1" class="w-full" x-model.number="overlapOffset">
                         </div>
                     </div>
+                    </div>
                 </section>
 
-                <section x-show="usesSplit" x-cloak>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Split</h2>
+                <section class="sidebar-group" x-show="usesSplit" x-cloak :class="panelOpen.split ? 'is-open' : 'is-collapsed'">
+                    <button
+                        type="button"
+                        class="sidebar-group-toggle"
+                        @click="togglePanel('split')"
+                        :aria-expanded="panelOpen.split.toString()"
+                    >
+                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Split</h2>
+                        <span class="text-xs text-zinc-400" x-show="!panelOpen.split" x-cloak x-text="Math.round(splitPosition) + '%'"></span>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.split && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="sidebar-group-body" x-show="panelOpen.split" x-cloak>
                     <div class="mb-1 flex items-center justify-between gap-2">
                         <label class="text-xs font-medium text-lumis-ink">Position</label>
                         <div class="flex items-center text-xs text-zinc-400">
@@ -323,10 +345,20 @@
                         </div>
                     </div>
                     <input type="range" min="0" max="100" step="0.1" class="w-full" x-model.number="splitPosition">
+                    </div>
                 </section>
 
-                <section>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Adjust</h2>
+                <section class="sidebar-group" :class="panelOpen.adjust ? 'is-open' : 'is-collapsed'">
+                    <button
+                        type="button"
+                        class="sidebar-group-toggle"
+                        @click="togglePanel('adjust')"
+                        :aria-expanded="panelOpen.adjust.toString()"
+                    >
+                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Adjust</h2>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.adjust && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="sidebar-group-body" x-show="panelOpen.adjust" x-cloak>
                     <div class="mb-3 flex flex-wrap gap-1.5">
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(swapSides)" @click="swapSides = !swapSides">Swap sides</button>
                     </div>
@@ -368,10 +400,21 @@
                         </div>
                         <input type="range" min="0" max="50" step="0.5" class="w-full" x-model.number="imageRadius">
                     </div>
+                    </div>
                 </section>
 
-                <section>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Labels</h2>
+                <section class="sidebar-group" :class="panelOpen.labels ? 'is-open' : 'is-collapsed'">
+                    <button
+                        type="button"
+                        class="sidebar-group-toggle"
+                        @click="togglePanel('labels')"
+                        :aria-expanded="panelOpen.labels.toString()"
+                    >
+                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Labels</h2>
+                        <span class="text-xs text-zinc-400" x-show="!panelOpen.labels" x-cloak x-text="labelsEnabled ? 'On' : 'Off'"></span>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.labels && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="sidebar-group-body" x-show="panelOpen.labels" x-cloak>
                     <div class="mb-3 flex flex-wrap gap-1.5">
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(!labelsEnabled)" @click="labelsEnabled = false">Off</button>
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(labelsEnabled)" @click="labelsEnabled = true">On</button>
@@ -442,12 +485,14 @@
                             <input type="range" min="50" max="160" step="1" class="w-full" x-model.number="labelSize">
                         </div>
                     </div>
+                    </div>
                 </section>
+                </div>
             </aside>
 
             {{-- Center preview / upload --}}
             <main
-                class="flex min-h-0 min-w-0 flex-1 flex-col bg-lumis-canvas"
+                class="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-lumis-canvas"
                 x-ref="previewStage"
                 @dragover.prevent="onDragOver($event)"
                 @dragleave.prevent="onDragLeave($event)"
@@ -540,35 +585,56 @@
                 </div>
             </main>
 
-            {{-- Right: background + export --}}
-            <aside class="flex w-[240px] shrink-0 flex-col gap-5 overflow-hidden border-l border-lumis-panel-line bg-lumis-panel-surface px-4 py-4">
-                <section>
-                    <div class="mb-2 flex items-baseline justify-between">
-                        <h2 class="text-sm font-semibold tracking-tight text-lumis-display">Background</h2>
-                        <span class="text-xs text-zinc-400">Export</span>
+            {{-- Right: background + overlay + export --}}
+            <aside class="flex h-full w-[240px] shrink-0 flex-col border-l border-lumis-panel-line bg-lumis-panel-surface">
+                <div class="sidebar-scroll">
+                <section class="sidebar-group" :class="panelOpen.background ? 'is-open' : 'is-collapsed'">
+                    <button
+                        type="button"
+                        class="sidebar-group-toggle"
+                        @click="togglePanel('background')"
+                        :aria-expanded="panelOpen.background.toString()"
+                    >
+                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Background</h2>
+                        <span class="text-xs capitalize text-zinc-400" x-show="!panelOpen.background" x-cloak x-text="backgroundSummary"></span>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.background && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="sidebar-group-body" x-show="panelOpen.background" x-cloak>
+                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
+                        <span class="font-medium">Per side</span>
+                        <input
+                            type="checkbox"
+                            class="size-3.5 accent-lumis-ink"
+                            :checked="backgroundPerSide"
+                            @change="setBackgroundPerSide($event.target.checked)"
+                        >
+                    </label>
+                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="backgroundPerSide" x-cloak>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(backgroundEditSide === 'a')" @click="backgroundEditSide = 'a'">A</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(backgroundEditSide === 'b')" @click="backgroundEditSide = 'b'">B</button>
                     </div>
-                    <div class="flex flex-wrap gap-1.5">
+                    <div class="mt-3 flex flex-wrap gap-1.5">
                         <template x-for="option in backgroundOptions" :key="option.id">
                             <button
                                 type="button"
                                 class="px-2.5 py-1.5 text-xs font-medium"
-                                :class="segmentClass(backgroundType === option.id)"
-                                @click="backgroundType = option.id"
+                                :class="segmentClass(activeBackgroundType === option.id)"
+                                @click="activeBackgroundType = option.id"
                                 x-text="option.label"
                             ></button>
                         </template>
                     </div>
                     <div class="mt-3 flex items-center gap-3">
                         <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                            <input type="color" x-model="backgroundBg">
+                            <input type="color" x-model="activeBackgroundBg">
                             Base
                         </label>
-                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" x-show="backgroundType !== 'solid'" x-cloak>
-                            <input type="color" x-model="backgroundFg">
+                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" x-show="activeBackgroundType !== 'solid'" x-cloak>
+                            <input type="color" x-model="activeBackgroundFg">
                             Pattern
                         </label>
                     </div>
-                    <div class="mt-3" x-show="backgroundType !== 'solid'" x-cloak>
+                    <div class="mt-3" x-show="activeBackgroundType !== 'solid'" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Density</label>
                             <input
@@ -577,20 +643,108 @@
                                 max="80"
                                 step="1"
                                 class="slider-value"
-                                x-model.number="backgroundDensity"
-                                @blur="clampSlider('backgroundDensity', 8, 80)"
+                                x-model.number="activeBackgroundDensity"
+                                @blur="clampActiveBackgroundDensity()"
                                 @keydown.enter="$event.target.blur()"
                             >
                         </div>
-                        <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="backgroundDensity">
+                        <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="activeBackgroundDensity">
+                    </div>
                     </div>
                 </section>
 
-                <section>
-                    <div class="mb-2 flex items-baseline justify-between">
-                        <h2 class="text-sm font-semibold tracking-tight text-lumis-display">Export</h2>
-                        <span class="text-xs text-zinc-400" x-text="exportSizeLabel"></span>
+                <section class="sidebar-group" :class="panelOpen.overlay ? 'is-open' : 'is-collapsed'">
+                    <button
+                        type="button"
+                        class="sidebar-group-toggle"
+                        @click="togglePanel('overlay')"
+                        :aria-expanded="panelOpen.overlay.toString()"
+                    >
+                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Overlay</h2>
+                        <span class="text-xs capitalize text-zinc-400" x-show="!panelOpen.overlay" x-cloak x-text="overlaySummary"></span>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.overlay && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="sidebar-group-body" x-show="panelOpen.overlay" x-cloak>
+                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
+                        <span class="font-medium">Per side</span>
+                        <input
+                            type="checkbox"
+                            class="size-3.5 accent-lumis-ink"
+                            :checked="overlayPerSide"
+                            @change="setOverlayPerSide($event.target.checked)"
+                        >
+                    </label>
+                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="overlayPerSide" x-cloak>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'a')" @click="overlayEditSide = 'a'">A</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'b')" @click="overlayEditSide = 'b'">B</button>
                     </div>
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                        <template x-for="option in overlayOptions" :key="option.id">
+                            <button
+                                type="button"
+                                class="px-2.5 py-1.5 text-xs font-medium"
+                                :class="segmentClass(activeOverlayType === option.id)"
+                                @click="activeOverlayType = option.id"
+                                x-text="option.label"
+                            ></button>
+                        </template>
+                    </div>
+                    <div class="mt-3 space-y-3" x-show="activeOverlayType !== 'none'" x-cloak>
+                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                            <input type="color" x-model="activeOverlayColor">
+                            Color
+                        </label>
+                        <div>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Opacity</label>
+                                <div class="flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="5"
+                                        max="80"
+                                        step="1"
+                                        class="slider-value"
+                                        x-model.number="activeOverlayOpacity"
+                                        @blur="clampActiveOverlayOpacity()"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            <input type="range" min="5" max="80" step="1" class="w-full" x-model.number="activeOverlayOpacity">
+                        </div>
+                        <div>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Density</label>
+                                <input
+                                    type="number"
+                                    min="8"
+                                    max="80"
+                                    step="1"
+                                    class="slider-value"
+                                    x-model.number="activeOverlayDensity"
+                                    @blur="clampActiveOverlayDensity()"
+                                    @keydown.enter="$event.target.blur()"
+                                >
+                            </div>
+                            <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="activeOverlayDensity">
+                        </div>
+                    </div>
+                    </div>
+                </section>
+
+                <section class="sidebar-group" :class="panelOpen.export ? 'is-open' : 'is-collapsed'">
+                    <button
+                        type="button"
+                        class="sidebar-group-toggle"
+                        @click="togglePanel('export')"
+                        :aria-expanded="panelOpen.export.toString()"
+                    >
+                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Export</h2>
+                        <span class="text-xs text-zinc-400" x-text="exportSizeLabel"></span>
+                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.export && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                    <div class="sidebar-group-body" x-show="panelOpen.export" x-cloak>
 
                     <div class="mb-3" x-show="exportFormat !== 'video'" x-cloak>
                         <p class="mb-2 text-xs font-medium text-lumis-ink">Scale</p>
@@ -716,8 +870,11 @@
                             ></button>
                         </div>
                     </div>
+                    </div>
                 </section>
+                </div>
             </aside>
+            </div>
         </div>
     </div>
 
@@ -834,7 +991,7 @@
             aria-labelledby="preset-modal-title"
         >
             <h2 id="preset-modal-title" class="text-sm font-semibold tracking-tight text-lumis-display">Save preset</h2>
-            <p class="mt-1 text-xs text-zinc-400">Stores layout, split, labels, background, and export settings — not images.</p>
+            <p class="mt-1 text-xs text-zinc-400">Stores layout, split, labels, background, overlay, and export settings — not images.</p>
             <label class="mt-4 block">
                 <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Name</span>
                 <input
