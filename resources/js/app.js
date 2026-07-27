@@ -146,6 +146,9 @@ document.addEventListener('alpine:init', () => {
         videoReverse: false,
         videoContainer: 'auto',
         videoTransition: 'wipe',
+        videoEasing: 'linear',
+        videoHoldStart: 0.25,
+        videoHoldEnd: 0.25,
         videoPreviewing: false,
         _videoPreviewToken: 0,
         exporting: false,
@@ -170,6 +173,11 @@ document.addEventListener('alpine:init', () => {
             { id: 'push', label: 'Push' },
             { id: 'iris', label: 'Iris' },
             { id: 'reveal', label: 'Reveal' },
+        ],
+
+        videoEasingOptions: [
+            { id: 'linear', label: 'Linear' },
+            { id: 'ease-in-out', label: 'Ease in-out' },
         ],
 
         panelOpen: { ...DEFAULT_PANELS },
@@ -358,19 +366,24 @@ document.addEventListener('alpine:init', () => {
             if (!this.imageA || !this.imageB) {
                 return false;
             }
-            if (this.exportFormat === 'video') {
+            if (this.exportFormat === 'video' || this.exportFormat === 'gif') {
                 return this.usesSplit;
             }
             return this.exportFormat === 'png' || this.exportFormat === 'jpg';
         },
 
+        get usesMotionExport() {
+            return this.exportFormat === 'video' || this.exportFormat === 'gif';
+        },
+
         get canPreviewVideo() {
-            return this.hasBothImages && this.usesSplit && this.exportFormat === 'video' && !this.exporting;
+            return this.hasBothImages && this.usesSplit && this.usesMotionExport && !this.exporting;
         },
 
         get exportSizeLabel() {
-            const { width, height } =
-                this.exportFormat === 'video' ? this.resolveVideoSize() : this.resolveExportSize();
+            const { width, height } = this.usesMotionExport
+                ? this.resolveVideoSize()
+                : this.resolveExportSize();
             return `${width} × ${height}`;
         },
 
@@ -512,7 +525,10 @@ document.addEventListener('alpine:init', () => {
                     Number(this.videoFps) !== 30 ||
                     this.videoReverse ||
                     this.videoContainer !== 'auto' ||
-                    this.videoTransition !== 'wipe'
+                    this.videoTransition !== 'wipe' ||
+                    this.videoEasing !== 'linear' ||
+                    Number(this.videoHoldStart) !== 0.25 ||
+                    Number(this.videoHoldEnd) !== 0.25
                 );
             }
             return false;
@@ -588,6 +604,9 @@ document.addEventListener('alpine:init', () => {
                 this.videoReverse = false;
                 this.videoContainer = 'auto';
                 this.videoTransition = 'wipe';
+                this.videoEasing = 'linear';
+                this.videoHoldStart = 0.25;
+                this.videoHoldEnd = 0.25;
             }
         },
 
@@ -735,27 +754,35 @@ document.addEventListener('alpine:init', () => {
 
             this.videoPreviewing = true;
             const token = ++this._videoPreviewToken;
-            const fps = this.videoFps;
-            const frameCount = Math.max(2, Math.round(fps * this.videoDuration));
-            const frameDelay = 1000 / fps;
             const preview = this.$refs.previewCanvas;
+            const { buildTransitionFrames } = await this.loadVideoExport();
+            const { frameDelay, frames } = buildTransitionFrames({
+                videoFps: this.videoFps,
+                videoDuration: this.videoDuration,
+                videoHoldStart: this.videoHoldStart,
+                videoHoldEnd: this.videoHoldEnd,
+                videoEasing: this.videoEasing,
+                videoReverse: this.videoReverse,
+            });
 
             try {
-                for (let i = 0; i <= frameCount; i++) {
+                for (let i = 0; i < frames.length; i++) {
                     if (token !== this._videoPreviewToken || !this.canPreviewVideo) {
                         return;
                     }
 
-                    const t = i / frameCount;
-                    const progress = this.videoReverse ? 1 - t : t;
                     const options = this.buildOptions(this.baseWidth, this.baseHeight);
-                    this.compositor.renderVideoFrame(options, this.videoTransition, clamp(progress, 0, 1));
+                    this.compositor.renderVideoFrame(
+                        options,
+                        this.videoTransition,
+                        clamp(frames[i].progress, 0, 1),
+                    );
 
                     if (preview) {
                         this.previewMetrics = this.compositor.drawPreview(preview);
                     }
 
-                    this.statusMessage = `Preview… ${Math.round((i / frameCount) * 100)}%`;
+                    this.statusMessage = `Preview… ${Math.round((i / Math.max(1, frames.length - 1)) * 100)}%`;
                     await wait(frameDelay);
                 }
 
@@ -840,6 +867,9 @@ document.addEventListener('alpine:init', () => {
                 videoReverse: this.videoReverse,
                 videoContainer: this.videoContainer,
                 videoTransition: this.videoTransition,
+                videoEasing: this.videoEasing,
+                videoHoldStart: this.videoHoldStart,
+                videoHoldEnd: this.videoHoldEnd,
             };
         },
 
@@ -984,7 +1014,7 @@ document.addEventListener('alpine:init', () => {
             if (['1', '1.5', '2'].includes(String(settings.exportScale))) {
                 this.exportScale = String(settings.exportScale);
             }
-            if (['png', 'jpg', 'video'].includes(settings.exportFormat)) {
+            if (['png', 'jpg', 'video', 'gif'].includes(settings.exportFormat)) {
                 this.exportFormat = settings.exportFormat;
             } else if (settings.exportJpg && settings.exportPng !== true) {
                 this.exportFormat = 'jpg';
@@ -1007,6 +1037,16 @@ document.addEventListener('alpine:init', () => {
             const transitions = new Set(this.videoTransitionOptions.map((item) => item.id));
             if (transitions.has(settings.videoTransition)) {
                 this.videoTransition = settings.videoTransition;
+            }
+            const easings = new Set(this.videoEasingOptions.map((item) => item.id));
+            if (easings.has(settings.videoEasing)) {
+                this.videoEasing = settings.videoEasing;
+            }
+            if (Number.isFinite(Number(settings.videoHoldStart))) {
+                this.videoHoldStart = Math.min(2, Math.max(0, Number(settings.videoHoldStart)));
+            }
+            if (Number.isFinite(Number(settings.videoHoldEnd))) {
+                this.videoHoldEnd = Math.min(2, Math.max(0, Number(settings.videoHoldEnd)));
             }
 
             this.previewTool = this.layout === 'diagonal' ? 'angle' : 'position';
@@ -1333,15 +1373,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         selectExportFormat(format) {
+            this.stopVideoPreview();
             this.exportFormat = format;
-            if (format === 'video') {
+            if (format === 'video' || format === 'gif') {
                 this.loadVideoExport();
             }
         },
 
-        async recordTransitionVideo(width, height) {
-            const { recordTransitionVideo } = await this.loadVideoExport();
-            return recordTransitionVideo({
+        motionExportParams(width, height) {
+            return {
                 width,
                 height,
                 videoContainer: this.videoContainer,
@@ -1349,12 +1389,25 @@ document.addEventListener('alpine:init', () => {
                 videoDuration: this.videoDuration,
                 videoReverse: this.videoReverse,
                 videoTransition: this.videoTransition,
+                videoHoldStart: this.videoHoldStart,
+                videoHoldEnd: this.videoHoldEnd,
+                videoEasing: this.videoEasing,
                 compositor: this.compositor,
                 buildOptions: (w, h) => this.buildOptions(w, h),
                 onProgress: (message) => {
                     this.statusMessage = message;
                 },
-            });
+            };
+        },
+
+        async recordTransitionVideo(width, height) {
+            const { recordTransitionVideo } = await this.loadVideoExport();
+            return recordTransitionVideo(this.motionExportParams(width, height));
+        },
+
+        async recordTransitionGif(width, height) {
+            const { recordTransitionGif } = await this.loadVideoExport();
+            return recordTransitionGif(this.motionExportParams(width, height));
         },
 
         buildOptions(width, height) {
@@ -1807,13 +1860,21 @@ document.addEventListener('alpine:init', () => {
             try {
                 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
-                if (this.exportFormat === 'video') {
+                if (this.exportFormat === 'video' || this.exportFormat === 'gif') {
                     if (!this.usesSplit) {
-                        this.statusMessage = 'Video export needs a split layout (not Overlap).';
+                        this.statusMessage = `${this.exportFormat === 'gif' ? 'GIF' : 'Video'} export needs a split layout (not Overlap).`;
                         return;
                     }
 
                     const { width, height } = this.resolveVideoSize();
+                    if (this.exportFormat === 'gif') {
+                        this.statusMessage = 'Encoding GIF…';
+                        const { blob, extension, label } = await this.recordTransitionGif(width, height);
+                        this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${extension}`);
+                        this.statusMessage = `Exported ${label} (${width} × ${height}).`;
+                        return;
+                    }
+
                     this.statusMessage = 'Recording video…';
                     const { blob, extension, label } = await this.recordTransitionVideo(width, height);
                     this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${extension}`);

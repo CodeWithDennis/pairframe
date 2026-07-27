@@ -905,7 +905,7 @@
                     </div>
                     <div class="sidebar-group-body" x-show="panelOpen.export" x-cloak>
 
-                    <div class="mb-3" x-show="exportFormat !== 'video'" x-cloak>
+                    <div class="mb-3" x-show="!usesMotionExport" x-cloak>
                         <p class="mb-2 text-xs font-medium text-lumis-ink">Scale</p>
                         <div class="flex flex-wrap gap-1.5">
                             <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '1')" @click="exportScale = '1'">1×</button>
@@ -916,8 +916,8 @@
 
                     <p class="mb-2 text-xs font-medium text-lumis-ink">Format</p>
                     <div class="mb-3 flex flex-wrap gap-1.5">
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'png')" @click="stopVideoPreview(); exportFormat = 'png'">PNG</button>
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'jpg')" @click="stopVideoPreview(); exportFormat = 'jpg'">JPG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'png')" @click="selectExportFormat('png')">PNG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'jpg')" @click="selectExportFormat('jpg')">JPG</button>
                         <button
                             type="button"
                             class="px-2.5 py-1.5 text-xs font-medium"
@@ -925,6 +925,13 @@
                             :title="usesSplit ? 'Transition video at source resolution' : 'Video needs a split layout'"
                             @click="selectExportFormat('video')"
                         >Video</button>
+                        <button
+                            type="button"
+                            class="px-2.5 py-1.5 text-xs font-medium"
+                            :class="segmentClass(exportFormat === 'gif')"
+                            :title="usesSplit ? 'Animated GIF at source resolution' : 'GIF needs a split layout'"
+                            @click="selectExportFormat('gif')"
+                        >GIF</button>
                     </div>
 
                     <div x-show="exportFormat === 'jpg'" x-cloak>
@@ -947,9 +954,9 @@
                         <input type="range" min="50" max="100" step="1" class="w-full" x-model.number="jpgQuality">
                     </div>
 
-                    <div class="mt-3 space-y-3" x-show="exportFormat === 'video'" x-cloak>
-                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak>Transition · source resolution</p>
-                        <p class="text-xs text-lumis-status-uploading" x-show="!usesSplit" x-cloak>Switch to Vertical, Horizontal, or Diagonal for video.</p>
+                    <div class="mt-3 space-y-3" x-show="usesMotionExport" x-cloak>
+                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak x-text="exportFormat === 'gif' ? 'Animated GIF · source resolution' : 'Transition · source resolution'"></p>
+                        <p class="text-xs text-lumis-status-uploading" x-show="!usesSplit" x-cloak>Switch to Vertical, Horizontal, or Diagonal for motion export.</p>
                         <div x-show="usesSplit" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">Transition</p>
                             <div class="flex flex-wrap gap-1.5">
@@ -964,7 +971,7 @@
                                 </template>
                             </div>
                         </div>
-                        <div x-show="usesSplit" x-cloak>
+                        <div x-show="usesSplit && exportFormat === 'video'" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">Container</p>
                             <div class="flex flex-wrap gap-1.5">
                                 <template x-for="option in videoContainerOptions" :key="option.id">
@@ -975,6 +982,20 @@
                                         :disabled="(option.id === 'mp4' && !supportsMp4Video) || (option.id === 'webm' && !supportsWebmVideo)"
                                         :title="option.id === 'mp4' && !supportsMp4Video ? 'MP4 not supported here' : (option.id === 'webm' && !supportsWebmVideo ? 'WebM not supported here' : '')"
                                         @click="videoContainer = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <p class="mb-1.5 text-xs font-medium text-lumis-ink">Easing</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in videoEasingOptions" :key="option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(videoEasing === option.id)"
+                                        @click="stopVideoPreview(); videoEasing = option.id"
                                         x-text="option.label"
                                     ></button>
                                 </template>
@@ -998,6 +1019,44 @@
                                 </div>
                             </div>
                             <input type="range" min="1" max="6" step="0.5" class="w-full" x-model.number="videoDuration">
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Hold start</label>
+                                <div class="flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="2"
+                                        step="0.05"
+                                        class="slider-value"
+                                        x-model.number="videoHoldStart"
+                                        @blur="clampSlider('videoHoldStart', 0, 2)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>s</span>
+                                </div>
+                            </div>
+                            <input type="range" min="0" max="2" step="0.05" class="w-full" x-model.number="videoHoldStart">
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Hold end</label>
+                                <div class="flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="2"
+                                        step="0.05"
+                                        class="slider-value"
+                                        x-model.number="videoHoldEnd"
+                                        @blur="clampSlider('videoHoldEnd', 0, 2)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>s</span>
+                                </div>
+                            </div>
+                            <input type="range" min="0" max="2" step="0.05" class="w-full" x-model.number="videoHoldEnd">
                         </div>
                         <div x-show="usesSplit" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">FPS</p>

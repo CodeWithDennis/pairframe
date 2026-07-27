@@ -99,4 +99,4 @@ Local builds are unsigned unless you configure Apple or Windows code signing. Pr
 - Overlay pattern marks only (dots, grid, and more) with color, opacity, and density — no base fill; optional per-side A/B
 - Collapsible sidebar groups with scrollable panels and per-group reset (shown when dirty)
 - Save / load settings presets (images are not stored)
-- Export PNG or JPG at optional scale (1×, 1.5×, 2×), or transition video (wipe, dissolve, push, iris, reveal → MP4 / WebM)
+- Export PNG or JPG at optional scale (1×, 1.5×, 2×), transition video (MP4 / WebM), or animated GIF — with easing and hold-start/hold-end

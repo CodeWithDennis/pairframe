@@ -209,10 +209,6 @@
         background: var(--color-lumis-panel-surface);
     }
 
-    .sidebar-group:last-child {
-        border-bottom: 0;
-    }
-
     .sidebar-group.is-collapsed {
         background: var(--color-lumis-segment-idle);
     }
