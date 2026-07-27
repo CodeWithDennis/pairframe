@@ -14,6 +14,51 @@ const DEFAULT_PANELS = {
     export: true,
 };
 
+const LABEL_PRESET_IDS = [
+    'top-left',
+    'top-center',
+    'top-right',
+    'middle-left',
+    'middle-center',
+    'middle-right',
+    'bottom-left',
+    'bottom-center',
+    'bottom-right',
+];
+
+const LABEL_PRESET_ANCHORS = {
+    'top-left': { x: 0, y: 0 },
+    'top-center': { x: 50, y: 0 },
+    'top-right': { x: 100, y: 0 },
+    'middle-left': { x: 0, y: 50 },
+    'middle-center': { x: 50, y: 50 },
+    'middle-right': { x: 100, y: 50 },
+    'bottom-left': { x: 0, y: 100 },
+    'bottom-center': { x: 50, y: 100 },
+    'bottom-right': { x: 100, y: 100 },
+};
+
+const LABEL_PRESET_SET = new Set(LABEL_PRESET_IDS);
+const DEFAULT_DIAGONAL_ANGLE = Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10;
+
+function labelPresetAnchor(preset) {
+    return LABEL_PRESET_ANCHORS[preset] || LABEL_PRESET_ANCHORS['bottom-left'];
+}
+
+function migrateLegacyLabelPreset(oldPosition, side) {
+    const axis = oldPosition === 'top' || oldPosition === 'middle' || oldPosition === 'bottom' ? oldPosition : null;
+    if (!axis) {
+        return null;
+    }
+    if (side === 'a') {
+        return axis === 'top' ? 'top-left' : axis === 'middle' ? 'middle-left' : 'bottom-left';
+    }
+    if (side === 'b') {
+        return axis === 'top' ? 'top-right' : axis === 'middle' ? 'middle-right' : 'bottom-right';
+    }
+    return axis === 'top' ? 'top-center' : axis === 'middle' ? 'middle-center' : 'bottom-center';
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('pairframe', () => ({
         imageA: null,
@@ -28,7 +73,7 @@ document.addEventListener('alpine:init', () => {
         baseHeight: 720,
 
         layout: 'vertical',
-        diagonalAngle: Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10,
+        diagonalAngle: DEFAULT_DIAGONAL_ANGLE,
         diagonalStyle: 'straight',
         diagonalDensity: 1.5,
         splitStyle: 'straight',
@@ -42,18 +87,33 @@ document.addEventListener('alpine:init', () => {
         imageRadius: 0,
 
         labelsEnabled: false,
-        labelLeft: 'Left',
-        labelRight: 'Right',
+        labelA: 'Left',
+        labelB: 'Right',
         labelBadge: '',
-        labelLeftPosition: 'bottom',
-        labelRightPosition: 'bottom',
-        labelBadgePosition: 'top',
+        labelAMode: 'preset',
+        labelAPreset: 'bottom-left',
+        labelAX: 0,
+        labelAY: 100,
+        labelBMode: 'preset',
+        labelBPreset: 'bottom-right',
+        labelBX: 100,
+        labelBY: 100,
+        labelBadgeMode: 'preset',
+        labelBadgePreset: 'top-center',
+        labelBadgeX: 50,
+        labelBadgeY: 0,
         labelSize: 100,
 
-        labelPositions: [
-            { id: 'top', label: 'Top', labelHorizontal: 'Left' },
-            { id: 'middle', label: 'Middle', labelHorizontal: 'Center' },
-            { id: 'bottom', label: 'Bottom', labelHorizontal: 'Right' },
+        labelPresetOptions: [
+            { id: 'top-left', short: 'TL' },
+            { id: 'top-center', short: 'TC' },
+            { id: 'top-right', short: 'TR' },
+            { id: 'middle-left', short: 'ML' },
+            { id: 'middle-center', short: 'MC' },
+            { id: 'middle-right', short: 'MR' },
+            { id: 'bottom-left', short: 'BL' },
+            { id: 'bottom-center', short: 'BC' },
+            { id: 'bottom-right', short: 'BR' },
         ],
 
         backgroundType: 'dots',
@@ -201,12 +261,21 @@ document.addEventListener('alpine:init', () => {
                     this.imagePadding,
                     this.imageRadius,
                     this.labelsEnabled,
-                    this.labelLeft,
-                    this.labelRight,
+                    this.labelA,
+                    this.labelB,
                     this.labelBadge,
-                    this.labelLeftPosition,
-                    this.labelRightPosition,
-                    this.labelBadgePosition,
+                    this.labelAMode,
+                    this.labelAPreset,
+                    this.labelAX,
+                    this.labelAY,
+                    this.labelBMode,
+                    this.labelBPreset,
+                    this.labelBX,
+                    this.labelBY,
+                    this.labelBadgeMode,
+                    this.labelBadgePreset,
+                    this.labelBadgeX,
+                    this.labelBadgeY,
                     this.labelSize,
                     this.backgroundType,
                     this.backgroundBg,
@@ -364,6 +433,272 @@ document.addEventListener('alpine:init', () => {
             localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(this.panelOpen));
         },
 
+        sameColor(a, b) {
+            return String(a || '').toLowerCase() === String(b || '').toLowerCase();
+        },
+
+        groupDirty(id) {
+            if (id === 'layout') {
+                return (
+                    this.layout !== 'vertical' ||
+                    this.splitStyle !== 'straight' ||
+                    this.diagonalStyle !== 'straight' ||
+                    Number(this.diagonalAngle) !== DEFAULT_DIAGONAL_ANGLE ||
+                    Number(this.diagonalDensity) !== 1.5 ||
+                    this.overlapVariant !== 'cards' ||
+                    Number(this.overlapOffset) !== 12 ||
+                    this.overlapShadow !== true
+                );
+            }
+            if (id === 'split') {
+                return Number(this.splitPosition) !== 50;
+            }
+            if (id === 'adjust') {
+                return this.swapSides || Number(this.imagePadding) !== 0 || Number(this.imageRadius) !== 0;
+            }
+            if (id === 'labels') {
+                return (
+                    this.labelsEnabled ||
+                    this.labelA !== 'Left' ||
+                    this.labelB !== 'Right' ||
+                    this.labelBadge !== '' ||
+                    this.labelAMode !== 'preset' ||
+                    this.labelAPreset !== 'bottom-left' ||
+                    Number(this.labelAX) !== 0 ||
+                    Number(this.labelAY) !== 100 ||
+                    this.labelBMode !== 'preset' ||
+                    this.labelBPreset !== 'bottom-right' ||
+                    Number(this.labelBX) !== 100 ||
+                    Number(this.labelBY) !== 100 ||
+                    this.labelBadgeMode !== 'preset' ||
+                    this.labelBadgePreset !== 'top-center' ||
+                    Number(this.labelBadgeX) !== 50 ||
+                    Number(this.labelBadgeY) !== 0 ||
+                    Number(this.labelSize) !== 100
+                );
+            }
+            if (id === 'background') {
+                return (
+                    this.backgroundType !== 'dots' ||
+                    !this.sameColor(this.backgroundBg, '#FAFAFA') ||
+                    !this.sameColor(this.backgroundFg, '#E5E5E5') ||
+                    Number(this.backgroundDensity) !== 24 ||
+                    this.backgroundPerSide ||
+                    this.backgroundBType !== 'dots' ||
+                    !this.sameColor(this.backgroundBBg, '#FAFAFA') ||
+                    !this.sameColor(this.backgroundBFg, '#E5E5E5') ||
+                    Number(this.backgroundBDensity) !== 24
+                );
+            }
+            if (id === 'overlay') {
+                return (
+                    this.overlayType !== 'none' ||
+                    !this.sameColor(this.overlayColor, '#171717') ||
+                    Number(this.overlayOpacity) !== 25 ||
+                    Number(this.overlayDensity) !== 24 ||
+                    this.overlayPerSide ||
+                    this.overlayBType !== 'none' ||
+                    !this.sameColor(this.overlayBColor, '#171717') ||
+                    Number(this.overlayBOpacity) !== 25 ||
+                    Number(this.overlayBDensity) !== 24
+                );
+            }
+            if (id === 'export') {
+                return (
+                    String(this.exportScale) !== '1' ||
+                    this.exportFormat !== 'png' ||
+                    Number(this.jpgQuality) !== 92 ||
+                    Number(this.videoDuration) !== 2 ||
+                    Number(this.videoFps) !== 30 ||
+                    this.videoReverse ||
+                    this.videoContainer !== 'auto' ||
+                    this.videoTransition !== 'wipe'
+                );
+            }
+            return false;
+        },
+
+        resetGroup(id) {
+            if (id === 'layout') {
+                this.stopVideoPreview();
+                this.layout = 'vertical';
+                this.diagonalAngle = DEFAULT_DIAGONAL_ANGLE;
+                this.setSplitStyle('straight');
+                this.diagonalDensity = 1.5;
+                this.overlapVariant = 'cards';
+                this.overlapOffset = 12;
+                this.overlapShadow = true;
+                this.previewTool = 'position';
+                return;
+            }
+            if (id === 'split') {
+                this.splitPosition = 50;
+                return;
+            }
+            if (id === 'adjust') {
+                this.swapSides = false;
+                this.imagePadding = 0;
+                this.imageRadius = 0;
+                return;
+            }
+            if (id === 'labels') {
+                this.labelsEnabled = false;
+                this.labelA = 'Left';
+                this.labelB = 'Right';
+                this.labelBadge = '';
+                this.setLabelPreset('a', 'bottom-left');
+                this.setLabelPreset('b', 'bottom-right');
+                this.setLabelPreset('badge', 'top-center');
+                this.labelSize = 100;
+                return;
+            }
+            if (id === 'background') {
+                this.backgroundType = 'dots';
+                this.backgroundBg = '#FAFAFA';
+                this.backgroundFg = '#E5E5E5';
+                this.backgroundDensity = 24;
+                this.backgroundPerSide = false;
+                this.backgroundEditSide = 'a';
+                this.backgroundBType = 'dots';
+                this.backgroundBBg = '#FAFAFA';
+                this.backgroundBFg = '#E5E5E5';
+                this.backgroundBDensity = 24;
+                return;
+            }
+            if (id === 'overlay') {
+                this.overlayType = 'none';
+                this.overlayColor = '#171717';
+                this.overlayOpacity = 25;
+                this.overlayDensity = 24;
+                this.overlayPerSide = false;
+                this.overlayEditSide = 'a';
+                this.overlayBType = 'none';
+                this.overlayBColor = '#171717';
+                this.overlayBOpacity = 25;
+                this.overlayBDensity = 24;
+                return;
+            }
+            if (id === 'export') {
+                this.stopVideoPreview();
+                this.exportScale = '1';
+                this.exportFormat = 'png';
+                this.jpgQuality = 92;
+                this.videoDuration = 2;
+                this.videoFps = 30;
+                this.videoReverse = false;
+                this.videoContainer = 'auto';
+                this.videoTransition = 'wipe';
+            }
+        },
+
+        applyLabelPlacementSettings(settings, suffix, side, legacyPosition) {
+            const modeKey = `label${suffix}Mode`;
+            const presetKey = `label${suffix}Preset`;
+            const xField = suffix === 'Badge' ? 'labelBadgeX' : `label${suffix}X`;
+            const yField = suffix === 'Badge' ? 'labelBadgeY' : `label${suffix}Y`;
+
+            if (settings[modeKey] === 'preset' || settings[modeKey] === 'custom') {
+                this[modeKey] = settings[modeKey];
+            }
+
+            if (LABEL_PRESET_SET.has(settings[presetKey])) {
+                this[presetKey] = settings[presetKey];
+            } else {
+                const migrated = migrateLegacyLabelPreset(legacyPosition, side);
+                if (migrated) {
+                    this[presetKey] = migrated;
+                    if (settings[modeKey] !== 'custom') {
+                        this[modeKey] = 'preset';
+                    }
+                }
+            }
+
+            if (Number.isFinite(Number(settings[xField]))) {
+                this[xField] = Math.min(100, Math.max(0, Number(settings[xField])));
+            }
+            if (Number.isFinite(Number(settings[yField]))) {
+                this[yField] = Math.min(100, Math.max(0, Number(settings[yField])));
+            }
+
+            if (this[modeKey] !== 'custom') {
+                this[modeKey] = 'preset';
+                const anchor = labelPresetAnchor(this[presetKey]);
+                this[xField] = anchor.x;
+                this[yField] = anchor.y;
+            }
+        },
+
+        setLabelPreset(side, preset) {
+            if (!LABEL_PRESET_SET.has(preset)) {
+                return;
+            }
+            const anchor = labelPresetAnchor(preset);
+            if (side === 'a') {
+                this.labelAMode = 'preset';
+                this.labelAPreset = preset;
+                this.labelAX = anchor.x;
+                this.labelAY = anchor.y;
+                return;
+            }
+            if (side === 'b') {
+                this.labelBMode = 'preset';
+                this.labelBPreset = preset;
+                this.labelBX = anchor.x;
+                this.labelBY = anchor.y;
+                return;
+            }
+            this.labelBadgeMode = 'preset';
+            this.labelBadgePreset = preset;
+            this.labelBadgeX = anchor.x;
+            this.labelBadgeY = anchor.y;
+        },
+
+        setLabelAxis(side, axis, value) {
+            const n = Math.min(100, Math.max(0, Number(value)));
+            const safe = Number.isFinite(n) ? n : 0;
+            if (side === 'a') {
+                this.labelAMode = 'custom';
+                if (axis === 'x') {
+                    this.labelAX = safe;
+                } else {
+                    this.labelAY = safe;
+                }
+                return;
+            }
+            if (side === 'b') {
+                this.labelBMode = 'custom';
+                if (axis === 'x') {
+                    this.labelBX = safe;
+                } else {
+                    this.labelBY = safe;
+                }
+                return;
+            }
+            this.labelBadgeMode = 'custom';
+            if (axis === 'x') {
+                this.labelBadgeX = safe;
+            } else {
+                this.labelBadgeY = safe;
+            }
+        },
+
+        clampLabelAxis(side, axis) {
+            const field =
+                side === 'a'
+                    ? axis === 'x'
+                        ? 'labelAX'
+                        : 'labelAY'
+                    : side === 'b'
+                      ? axis === 'x'
+                          ? 'labelBX'
+                          : 'labelBY'
+                      : axis === 'x'
+                        ? 'labelBadgeX'
+                        : 'labelBadgeY';
+            this.clampSlider(field, 0, 100);
+            this.setLabelAxis(side, axis, this[field]);
+        },
+
         get showsOverlapOffset() {
             return this.layout === 'overlap' && this.overlapVariant !== 'side';
         },
@@ -463,12 +798,21 @@ document.addEventListener('alpine:init', () => {
                 imagePadding: this.imagePadding,
                 imageRadius: this.imageRadius,
                 labelsEnabled: this.labelsEnabled,
-                labelLeft: this.labelLeft,
-                labelRight: this.labelRight,
+                labelA: this.labelA,
+                labelB: this.labelB,
                 labelBadge: this.labelBadge,
-                labelLeftPosition: this.labelLeftPosition,
-                labelRightPosition: this.labelRightPosition,
-                labelBadgePosition: this.labelBadgePosition,
+                labelAMode: this.labelAMode,
+                labelAPreset: this.labelAPreset,
+                labelAX: this.labelAX,
+                labelAY: this.labelAY,
+                labelBMode: this.labelBMode,
+                labelBPreset: this.labelBPreset,
+                labelBX: this.labelBX,
+                labelBY: this.labelBY,
+                labelBadgeMode: this.labelBadgeMode,
+                labelBadgePreset: this.labelBadgePreset,
+                labelBadgeX: this.labelBadgeX,
+                labelBadgeY: this.labelBadgeY,
                 labelSize: this.labelSize,
                 backgroundType: this.backgroundType,
                 backgroundBg: this.backgroundBg,
@@ -548,25 +892,22 @@ document.addEventListener('alpine:init', () => {
             if (typeof settings.labelsEnabled === 'boolean') {
                 this.labelsEnabled = settings.labelsEnabled;
             }
-            if (typeof settings.labelLeft === 'string') {
-                this.labelLeft = settings.labelLeft;
+            if (typeof settings.labelA === 'string') {
+                this.labelA = settings.labelA;
+            } else if (typeof settings.labelLeft === 'string') {
+                this.labelA = settings.labelLeft;
             }
-            if (typeof settings.labelRight === 'string') {
-                this.labelRight = settings.labelRight;
+            if (typeof settings.labelB === 'string') {
+                this.labelB = settings.labelB;
+            } else if (typeof settings.labelRight === 'string') {
+                this.labelB = settings.labelRight;
             }
             if (typeof settings.labelBadge === 'string') {
                 this.labelBadge = settings.labelBadge;
             }
-            const positions = new Set(this.labelPositions.map((item) => item.id));
-            if (positions.has(settings.labelLeftPosition)) {
-                this.labelLeftPosition = settings.labelLeftPosition;
-            }
-            if (positions.has(settings.labelRightPosition)) {
-                this.labelRightPosition = settings.labelRightPosition;
-            }
-            if (positions.has(settings.labelBadgePosition)) {
-                this.labelBadgePosition = settings.labelBadgePosition;
-            }
+            this.applyLabelPlacementSettings(settings, 'A', 'a', settings.labelLeftPosition);
+            this.applyLabelPlacementSettings(settings, 'B', 'b', settings.labelRightPosition);
+            this.applyLabelPlacementSettings(settings, 'Badge', 'badge', settings.labelBadgePosition);
             if (Number.isFinite(Number(settings.labelSize))) {
                 this.labelSize = Math.min(160, Math.max(50, Number(settings.labelSize)));
             }
@@ -1044,12 +1385,27 @@ document.addEventListener('alpine:init', () => {
                 imageRadius: this.imageRadius,
                 labels: {
                     enabled: this.labelsEnabled,
-                    left: this.labelLeft,
-                    right: this.labelRight,
-                    badge: this.labelBadge,
-                    leftPosition: this.labelLeftPosition,
-                    rightPosition: this.labelRightPosition,
-                    badgePosition: this.labelBadgePosition,
+                    a: {
+                        text: this.labelA,
+                        mode: this.labelAMode,
+                        preset: this.labelAPreset,
+                        x: Number(this.labelAX) || 0,
+                        y: Number(this.labelAY) || 0,
+                    },
+                    b: {
+                        text: this.labelB,
+                        mode: this.labelBMode,
+                        preset: this.labelBPreset,
+                        x: Number(this.labelBX) || 0,
+                        y: Number(this.labelBY) || 0,
+                    },
+                    badge: {
+                        text: this.labelBadge,
+                        mode: this.labelBadgeMode,
+                        preset: this.labelBadgePreset,
+                        x: Number(this.labelBadgeX) || 0,
+                        y: Number(this.labelBadgeY) || 0,
+                    },
                     size: this.labelSize,
                 },
                 background: {

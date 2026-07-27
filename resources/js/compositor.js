@@ -495,43 +495,98 @@ export function createCompositor() {
         return canvas;
     }
 
+    function labelPlacementXY(placement) {
+        const anchors = {
+            'top-left': { x: 0, y: 0 },
+            'top-center': { x: 50, y: 0 },
+            'top-right': { x: 100, y: 0 },
+            'middle-left': { x: 0, y: 50 },
+            'middle-center': { x: 50, y: 50 },
+            'middle-right': { x: 100, y: 50 },
+            'bottom-left': { x: 0, y: 100 },
+            'bottom-center': { x: 50, y: 100 },
+            'bottom-right': { x: 100, y: 100 },
+        };
+        if (placement?.mode === 'custom') {
+            return {
+                x: clamp(Number(placement.x) || 0, 0, 100),
+                y: clamp(Number(placement.y) || 0, 0, 100),
+            };
+        }
+        return anchors[placement?.preset] || anchors['bottom-left'];
+    }
+
+    function labelAlignFromXY(x, y) {
+        const alignX = x <= 25 ? 'left' : x >= 75 ? 'right' : 'center';
+        const alignY = y <= 25 ? 'top' : y >= 75 ? 'bottom' : 'middle';
+        return { alignX, alignY };
+    }
+
     function paintLabels(labelCtx, width, height, options) {
         const labels = options.labels;
         if (!labels?.enabled) {
             return;
         }
 
-        const leftText = String(labels.left || '').trim();
-        const rightText = String(labels.right || '').trim();
-        const badgeText = String(labels.badge || '').trim();
-        if (!leftText && !rightText && !badgeText) {
+        // Support legacy left/right shape during transition
+        const placementA = labels.a || {
+            text: labels.left,
+            mode: 'preset',
+            preset:
+                labels.leftPosition === 'top'
+                    ? 'top-left'
+                    : labels.leftPosition === 'middle'
+                      ? 'middle-left'
+                      : 'bottom-left',
+        };
+        const placementB = labels.b || {
+            text: labels.right,
+            mode: 'preset',
+            preset:
+                labels.rightPosition === 'top'
+                    ? 'top-right'
+                    : labels.rightPosition === 'middle'
+                      ? 'middle-right'
+                      : 'bottom-right',
+        };
+        const placementBadge =
+            labels.badge && typeof labels.badge === 'object'
+                ? labels.badge
+                : {
+                      text: typeof labels.badge === 'string' ? labels.badge : '',
+                      mode: 'preset',
+                      preset:
+                          labels.badgePosition === 'bottom'
+                              ? 'bottom-center'
+                              : labels.badgePosition === 'middle'
+                                ? 'middle-center'
+                                : 'top-center',
+                  };
+
+        const textA = String(placementA.text || '').trim();
+        const textB = String(placementB.text || '').trim();
+        const textBadge = String(placementBadge.text || '').trim();
+        if (!textA && !textB && !textBadge) {
             return;
         }
 
-        const family = options.layoutFamily || options.layout || 'vertical';
-        const leftPosition = labels.leftPosition || 'bottom';
-        const rightPosition = labels.rightPosition || 'bottom';
-        const badgePosition = labels.badgePosition || 'top';
         const scale = clamp(Number(labels.size) || 100, 50, 160) / 100;
         const fontSize = Math.max(11, Math.round(Math.min(width, height) * 0.032 * scale));
         const inset = Math.max(10, Math.round(Math.min(width, height) * 0.025));
+        // Anchor to the full content box so split-position changes do not drag labels around.
         const content = contentPadding(width, height, options);
-        const horizontal = family === 'horizontal' || (family === 'fade' && (options.layoutVariant || '') === 'tb');
 
-        const axisPoint = (start, size, position) => {
-            if (position === 'top') {
-                return start + inset + fontSize * 0.9;
-            }
-            if (position === 'bottom') {
-                return start + size - inset - fontSize * 0.9;
-            }
-            return start + size / 2;
-        };
-
-        const drawPill = (text, x, y, align = 'center') => {
+        const drawPill = (text, placement) => {
             if (!text) {
                 return;
             }
+
+            const { x: px, y: py } = labelPlacementXY(placement);
+            const { alignX, alignY } = labelAlignFromXY(px, py);
+            const innerW = Math.max(1, content.width - inset * 2);
+            const innerH = Math.max(1, content.height - inset * 2);
+            const x = content.x + inset + (innerW * px) / 100;
+            const y = content.y + inset + (innerH * py) / 100;
 
             labelCtx.save();
             labelCtx.font = `600 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
@@ -542,37 +597,32 @@ export function createCompositor() {
             const padY = fontSize * 0.42;
             const pillW = textWidth + padX * 2;
             const pillH = fontSize + padY * 2;
+
             let left = x - pillW / 2;
-            if (align === 'left') {
+            if (alignX === 'left') {
                 left = x;
-            } else if (align === 'right') {
+            } else if (alignX === 'right') {
                 left = x - pillW;
             }
-            const topY = y - pillH / 2;
+
+            let topY = y - pillH / 2;
+            if (alignY === 'top') {
+                topY = y;
+            } else if (alignY === 'bottom') {
+                topY = y - pillH;
+            }
 
             labelCtx.fillStyle = 'rgba(23, 23, 23, 0.72)';
             roundRectPath(labelCtx, left, topY, pillW, pillH, pillH / 2);
             labelCtx.fill();
             labelCtx.fillStyle = '#ffffff';
-            labelCtx.fillText(text, left + pillW / 2, y + 0.5);
+            labelCtx.fillText(text, left + pillW / 2, topY + pillH / 2 + 0.5);
             labelCtx.restore();
         };
 
-        if (horizontal) {
-            const topY = content.y + inset + fontSize * 0.9;
-            const bottomY = content.y + content.height - inset - fontSize * 0.9;
-            const leftAlign = leftPosition === 'top' ? 'left' : leftPosition === 'bottom' ? 'right' : 'center';
-            const rightAlign = rightPosition === 'top' ? 'left' : rightPosition === 'bottom' ? 'right' : 'center';
-            drawPill(leftText, axisPoint(content.x, content.width, leftPosition), topY, leftAlign);
-            drawPill(rightText, axisPoint(content.x, content.width, rightPosition), bottomY, rightAlign);
-        } else {
-            drawPill(leftText, content.x + inset, axisPoint(content.y, content.height, leftPosition), 'left');
-            drawPill(rightText, content.x + content.width - inset, axisPoint(content.y, content.height, rightPosition), 'right');
-        }
-
-        if (badgeText) {
-            drawPill(badgeText, content.x + content.width / 2, axisPoint(content.y, content.height, badgePosition), 'center');
-        }
+        drawPill(textA, placementA);
+        drawPill(textB, placementB);
+        drawPill(textBadge, placementBadge);
     }
 
     function drawPreview(previewCanvas) {

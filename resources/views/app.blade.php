@@ -200,15 +200,28 @@
             <aside class="flex h-full w-[240px] shrink-0 flex-col border-r border-lumis-panel-line bg-lumis-panel-surface">
                 <div class="sidebar-scroll">
                 <section class="sidebar-group" :class="panelOpen.layout ? 'is-open' : 'is-collapsed'">
-                    <button
-                        type="button"
-                        class="sidebar-group-toggle"
-                        @click="togglePanel('layout')"
-                        :aria-expanded="panelOpen.layout.toString()"
-                    >
-                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Layout</h2>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.layout && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('layout')"
+                            :aria-expanded="panelOpen.layout.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Layout</h2>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.layout && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('layout')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Layout"
+                            @click="resetGroup('layout')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="sidebar-group-body" x-show="panelOpen.layout" x-cloak>
                     <div class="flex flex-wrap gap-1.5">
                         <template x-for="option in layouts" :key="option.id">
@@ -317,16 +330,29 @@
                 </section>
 
                 <section class="sidebar-group" x-show="usesSplit" x-cloak :class="panelOpen.split ? 'is-open' : 'is-collapsed'">
-                    <button
-                        type="button"
-                        class="sidebar-group-toggle"
-                        @click="togglePanel('split')"
-                        :aria-expanded="panelOpen.split.toString()"
-                    >
-                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Split</h2>
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('split')"
+                            :aria-expanded="panelOpen.split.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Split</h2>
                         <span class="text-xs text-zinc-400" x-show="!panelOpen.split" x-cloak x-text="Math.round(splitPosition) + '%'"></span>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.split && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.split && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('split')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Split"
+                            @click="resetGroup('split')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="sidebar-group-body" x-show="panelOpen.split" x-cloak>
                     <div class="mb-1 flex items-center justify-between gap-2">
                         <label class="text-xs font-medium text-lumis-ink">Position</label>
@@ -349,15 +375,28 @@
                 </section>
 
                 <section class="sidebar-group" :class="panelOpen.adjust ? 'is-open' : 'is-collapsed'">
-                    <button
-                        type="button"
-                        class="sidebar-group-toggle"
-                        @click="togglePanel('adjust')"
-                        :aria-expanded="panelOpen.adjust.toString()"
-                    >
-                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Adjust</h2>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.adjust && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('adjust')"
+                            :aria-expanded="panelOpen.adjust.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Adjust</h2>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.adjust && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('adjust')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Adjust"
+                            @click="resetGroup('adjust')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="sidebar-group-body" x-show="panelOpen.adjust" x-cloak>
                     <div class="mb-3 flex flex-wrap gap-1.5">
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(swapSides)" @click="swapSides = !swapSides">Swap sides</button>
@@ -404,65 +443,147 @@
                 </section>
 
                 <section class="sidebar-group" :class="panelOpen.labels ? 'is-open' : 'is-collapsed'">
-                    <button
-                        type="button"
-                        class="sidebar-group-toggle"
-                        @click="togglePanel('labels')"
-                        :aria-expanded="panelOpen.labels.toString()"
-                    >
-                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Labels</h2>
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('labels')"
+                            :aria-expanded="panelOpen.labels.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Labels</h2>
                         <span class="text-xs text-zinc-400" x-show="!panelOpen.labels" x-cloak x-text="labelsEnabled ? 'On' : 'Off'"></span>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.labels && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.labels && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('labels')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Labels"
+                            @click="resetGroup('labels')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="sidebar-group-body" x-show="panelOpen.labels" x-cloak>
                     <div class="mb-3 flex flex-wrap gap-1.5">
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(!labelsEnabled)" @click="labelsEnabled = false">Off</button>
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(labelsEnabled)" @click="labelsEnabled = true">On</button>
                     </div>
-                    <div class="space-y-3" x-show="labelsEnabled" x-cloak>
+                    <div class="space-y-4" x-show="labelsEnabled" x-cloak>
                         <div>
-                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink" x-text="layout === 'horizontal' ? 'Top' : 'Left'"></span>
-                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelLeft" :placeholder="layout === 'horizontal' ? 'Top' : 'Left'">
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="option in labelPositions" :key="'left-' + option.id">
+                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Image A</span>
+                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelA" placeholder="Left">
+                            <div class="label-preset-grid" role="group" aria-label="Image A position">
+                                <template x-for="option in labelPresetOptions" :key="'a-' + option.id">
                                     <button
                                         type="button"
-                                        class="px-2.5 py-1.5 text-xs font-medium"
-                                        :class="segmentClass(labelLeftPosition === option.id)"
-                                        @click="labelLeftPosition = option.id"
-                                        x-text="layout === 'horizontal' ? option.labelHorizontal : option.label"
+                                        class="label-preset-cell"
+                                        :class="segmentClass(labelAMode === 'preset' && labelAPreset === option.id)"
+                                        @click="setLabelPreset('a', option.id)"
+                                        :title="option.id"
+                                        x-text="option.short"
                                     ></button>
                                 </template>
                             </div>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">X</label>
+                                        <div class="flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelAX" @input="setLabelAxis('a', 'x', labelAX)" @blur="clampLabelAxis('a', 'x')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelAX" @input="setLabelAxis('a', 'x', labelAX)">
+                                </div>
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">Y</label>
+                                        <div class="flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelAY" @input="setLabelAxis('a', 'y', labelAY)" @blur="clampLabelAxis('a', 'y')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelAY" @input="setLabelAxis('a', 'y', labelAY)">
+                                </div>
+                            </div>
                         </div>
                         <div>
-                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink" x-text="layout === 'horizontal' ? 'Bottom' : 'Right'"></span>
-                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelRight" :placeholder="layout === 'horizontal' ? 'Bottom' : 'Right'">
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="option in labelPositions" :key="'right-' + option.id">
+                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Image B</span>
+                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelB" placeholder="Right">
+                            <div class="label-preset-grid" role="group" aria-label="Image B position">
+                                <template x-for="option in labelPresetOptions" :key="'b-' + option.id">
                                     <button
                                         type="button"
-                                        class="px-2.5 py-1.5 text-xs font-medium"
-                                        :class="segmentClass(labelRightPosition === option.id)"
-                                        @click="labelRightPosition = option.id"
-                                        x-text="layout === 'horizontal' ? option.labelHorizontal : option.label"
+                                        class="label-preset-cell"
+                                        :class="segmentClass(labelBMode === 'preset' && labelBPreset === option.id)"
+                                        @click="setLabelPreset('b', option.id)"
+                                        :title="option.id"
+                                        x-text="option.short"
                                     ></button>
                                 </template>
+                            </div>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">X</label>
+                                        <div class="flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBX" @input="setLabelAxis('b', 'x', labelBX)" @blur="clampLabelAxis('b', 'x')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBX" @input="setLabelAxis('b', 'x', labelBX)">
+                                </div>
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">Y</label>
+                                        <div class="flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBY" @input="setLabelAxis('b', 'y', labelBY)" @blur="clampLabelAxis('b', 'y')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBY" @input="setLabelAxis('b', 'y', labelBY)">
+                                </div>
                             </div>
                         </div>
                         <div>
                             <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Badge</span>
                             <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelBadge" placeholder="v1.0">
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="option in labelPositions" :key="'badge-' + option.id">
+                            <div class="label-preset-grid" role="group" aria-label="Badge position">
+                                <template x-for="option in labelPresetOptions" :key="'badge-' + option.id">
                                     <button
                                         type="button"
-                                        class="px-2.5 py-1.5 text-xs font-medium"
-                                        :class="segmentClass(labelBadgePosition === option.id)"
-                                        @click="labelBadgePosition = option.id"
-                                        x-text="option.label"
+                                        class="label-preset-cell"
+                                        :class="segmentClass(labelBadgeMode === 'preset' && labelBadgePreset === option.id)"
+                                        @click="setLabelPreset('badge', option.id)"
+                                        :title="option.id"
+                                        x-text="option.short"
                                     ></button>
                                 </template>
+                            </div>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">X</label>
+                                        <div class="flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBadgeX" @input="setLabelAxis('badge', 'x', labelBadgeX)" @blur="clampLabelAxis('badge', 'x')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBadgeX" @input="setLabelAxis('badge', 'x', labelBadgeX)">
+                                </div>
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">Y</label>
+                                        <div class="flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBadgeY" @input="setLabelAxis('badge', 'y', labelBadgeY)" @blur="clampLabelAxis('badge', 'y')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBadgeY" @input="setLabelAxis('badge', 'y', labelBadgeY)">
+                                </div>
                             </div>
                         </div>
                         <div>
@@ -589,16 +710,29 @@
             <aside class="flex h-full w-[240px] shrink-0 flex-col border-l border-lumis-panel-line bg-lumis-panel-surface">
                 <div class="sidebar-scroll">
                 <section class="sidebar-group" :class="panelOpen.background ? 'is-open' : 'is-collapsed'">
-                    <button
-                        type="button"
-                        class="sidebar-group-toggle"
-                        @click="togglePanel('background')"
-                        :aria-expanded="panelOpen.background.toString()"
-                    >
-                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Background</h2>
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('background')"
+                            :aria-expanded="panelOpen.background.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Background</h2>
                         <span class="text-xs capitalize text-zinc-400" x-show="!panelOpen.background" x-cloak x-text="backgroundSummary"></span>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.background && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.background && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('background')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Background"
+                            @click="resetGroup('background')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="sidebar-group-body" x-show="panelOpen.background" x-cloak>
                     <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
                         <span class="font-medium">Per side</span>
@@ -654,16 +788,29 @@
                 </section>
 
                 <section class="sidebar-group" :class="panelOpen.overlay ? 'is-open' : 'is-collapsed'">
-                    <button
-                        type="button"
-                        class="sidebar-group-toggle"
-                        @click="togglePanel('overlay')"
-                        :aria-expanded="panelOpen.overlay.toString()"
-                    >
-                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Overlay</h2>
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('overlay')"
+                            :aria-expanded="panelOpen.overlay.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Overlay</h2>
                         <span class="text-xs capitalize text-zinc-400" x-show="!panelOpen.overlay" x-cloak x-text="overlaySummary"></span>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.overlay && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.overlay && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('overlay')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Overlay"
+                            @click="resetGroup('overlay')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="sidebar-group-body" x-show="panelOpen.overlay" x-cloak>
                     <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
                         <span class="font-medium">Per side</span>
@@ -734,16 +881,28 @@
                 </section>
 
                 <section class="sidebar-group" :class="panelOpen.export ? 'is-open' : 'is-collapsed'">
-                    <button
-                        type="button"
-                        class="sidebar-group-toggle"
-                        @click="togglePanel('export')"
-                        :aria-expanded="panelOpen.export.toString()"
-                    >
-                        <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Export</h2>
-                        <span class="text-xs text-zinc-400" x-text="exportSizeLabel"></span>
-                        <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.export && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('export')"
+                            :aria-expanded="panelOpen.export.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Export</h2>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.export && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('export')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Export"
+                            @click="resetGroup('export')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
                     <div class="sidebar-group-body" x-show="panelOpen.export" x-cloak>
 
                     <div class="mb-3" x-show="exportFormat !== 'video'" x-cloak>
