@@ -81,12 +81,17 @@ export function createCompositor() {
     const sideACtx = sideACanvas.getContext('2d', { willReadFrequently: false });
     const sideBBaseCanvas = document.createElement('canvas');
     const sideBBaseCtx = sideBBaseCanvas.getContext('2d', { willReadFrequently: false });
+    const frameACanvas = document.createElement('canvas');
+    const frameACtx = frameACanvas.getContext('2d', { willReadFrequently: false });
+    const frameBCanvas = document.createElement('canvas');
+    const frameBCtx = frameBCanvas.getContext('2d', { willReadFrequently: false });
 
     let lastOptions = null;
     let bgKey = '';
     let sideAKey = '';
     let sideBKey = '';
     let maskKey = '';
+    let transitionFrameKey = '';
 
     function resolveSides(options) {
         const light = options.lightImage;
@@ -487,8 +492,157 @@ export function createCompositor() {
         return { axis: 'x', position: split, padding };
     }
 
+    function transitionFramesCacheKey(options, width, height) {
+        const bg = options.background || {};
+        const light = options.lightImage;
+        const dark = options.darkImage;
+        return [
+            width,
+            height,
+            options.layoutFamily || options.layout || '',
+            options.layoutVariant || '',
+            Boolean(options.swapSides) ? 1 : 0,
+            Boolean(options.flipDirection) ? 1 : 0,
+            Boolean(options.invertMask) ? 1 : 0,
+            Number(options.maskDensity) || 0,
+            Number(options.diagonalAngle) || 0,
+            Number(options.imagePadding) || 0,
+            Number(options.imageRadius) || 0,
+            options.fitMode || 'cover',
+            bg.type || '',
+            bg.bg || '',
+            bg.fg || '',
+            Number(bg.density) || 0,
+            light?.src || '',
+            light?.naturalWidth || light?.width || 0,
+            light?.naturalHeight || light?.height || 0,
+            dark?.src || '',
+            dark?.naturalWidth || dark?.width || 0,
+            dark?.naturalHeight || dark?.height || 0,
+        ].join('|');
+    }
+
+    function ensureTransitionFrames(options, width, height) {
+        const key = transitionFramesCacheKey(options, width, height);
+        if (
+            key === transitionFrameKey &&
+            frameACanvas.width === width &&
+            frameACanvas.height === height &&
+            frameBCanvas.width === width &&
+            frameBCanvas.height === height
+        ) {
+            return;
+        }
+
+        const unlabeled = {
+            ...options,
+            width,
+            height,
+            labels: { ...(options.labels || {}), enabled: false },
+        };
+
+        render({ ...unlabeled, splitPosition: 0 });
+        ensureCanvasSize(frameACanvas, width, height);
+        frameACtx.drawImage(canvas, 0, 0);
+
+        render({ ...unlabeled, splitPosition: 1 });
+        ensureCanvasSize(frameBCanvas, width, height);
+        frameBCtx.drawImage(canvas, 0, 0);
+
+        transitionFrameKey = key;
+    }
+
+    function compositeTransition(transition, progress, width, height, layoutFamily) {
+        const t = clamp(progress, 0, 1);
+
+        if (!ensureCanvasSize(canvas, width, height)) {
+            ctx.clearRect(0, 0, width, height);
+        }
+
+        if (transition === 'dissolve') {
+            ctx.drawImage(frameACanvas, 0, 0);
+            if (t > 0) {
+                ctx.save();
+                ctx.globalAlpha = t;
+                ctx.drawImage(frameBCanvas, 0, 0);
+                ctx.restore();
+            }
+            return;
+        }
+
+        if (transition === 'push') {
+            const horizontal = layoutFamily === 'horizontal';
+            if (horizontal) {
+                const offset = Math.round(t * height);
+                ctx.drawImage(frameACanvas, 0, -offset);
+                ctx.drawImage(frameBCanvas, 0, height - offset);
+            } else {
+                const offset = Math.round(t * width);
+                ctx.drawImage(frameACanvas, -offset, 0);
+                ctx.drawImage(frameBCanvas, width - offset, 0);
+            }
+            return;
+        }
+
+        if (transition === 'iris') {
+            ctx.drawImage(frameACanvas, 0, 0);
+            if (t <= 0) {
+                return;
+            }
+            const radius = (t * Math.hypot(width, height)) / 2;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(width / 2, height / 2, radius, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(frameBCanvas, 0, 0);
+            ctx.restore();
+            return;
+        }
+
+        // reveal: expanding rectangle from center
+        ctx.drawImage(frameACanvas, 0, 0);
+        if (t <= 0) {
+            return;
+        }
+        const rw = Math.max(1, Math.round(t * width));
+        const rh = Math.max(1, Math.round(t * height));
+        const rx = Math.round((width - rw) / 2);
+        const ry = Math.round((height - rh) / 2);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(rx, ry, rw, rh);
+        ctx.clip();
+        ctx.drawImage(frameBCanvas, 0, 0);
+        ctx.restore();
+    }
+
+    /**
+     * Render one video transition frame. progress 0 = side A, 1 = side B.
+     * wipe reuses the layout split mask; other modes composite full A/B frames.
+     */
+    function renderVideoFrame(options, transition = 'wipe', progress = 0) {
+        const t = clamp(Number(progress) || 0, 0, 1);
+        const mode = transition || 'wipe';
+
+        if (mode === 'wipe') {
+            return render({ ...options, splitPosition: t });
+        }
+
+        const width = Math.max(1, Math.round(options.width || 1280));
+        const height = Math.max(1, Math.round(options.height || 720));
+        const family = options.layoutFamily || options.layout || 'vertical';
+
+        ensureTransitionFrames(options, width, height);
+        compositeTransition(mode, t, width, height, family);
+        paintLabels(ctx, width, height, options);
+        lastOptions = options;
+
+        return canvas;
+    }
+
     return {
         render,
+        renderVideoFrame,
         drawPreview,
         exportBlob,
         getCanvas,

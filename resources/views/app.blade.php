@@ -476,7 +476,7 @@
                             x-cloak
                             x-text="previewSizeLabel + (layout === 'overlap' ? '' : (layout === 'diagonal' ? (previewTool === 'angle' ? ' · drag to rotate' : ' · drag to move') : ' · drag to fine-tune'))"
                         ></span>
-                        <span class="text-xs text-zinc-400" x-show="videoPreviewing" x-cloak>Playing wipe preview</span>
+                        <span class="text-xs text-zinc-400" x-show="videoPreviewing" x-cloak x-text="'Playing ' + (videoTransitionOptions.find((item) => item.id === videoTransition)?.label || 'video').toLowerCase() + ' preview'"></span>
                         <span class="text-xs text-lumis-status-uploading" x-show="sizeWarning" x-text="sizeWarning" x-cloak></span>
                         <button
                             type="button"
@@ -607,7 +607,7 @@
                             type="button"
                             class="px-2.5 py-1.5 text-xs font-medium"
                             :class="segmentClass(exportFormat === 'video')"
-                            :title="usesSplit ? 'Wipe animation at source resolution' : 'Video needs a split layout'"
+                            :title="usesSplit ? 'Transition video at source resolution' : 'Video needs a split layout'"
                             @click="selectExportFormat('video')"
                         >Video</button>
                     </div>
@@ -633,8 +633,22 @@
                     </div>
 
                     <div class="mt-3 space-y-3" x-show="exportFormat === 'video'" x-cloak>
-                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak>Wipe animation · source resolution</p>
+                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak>Transition · source resolution</p>
                         <p class="text-xs text-lumis-status-uploading" x-show="!usesSplit" x-cloak>Switch to Vertical, Horizontal, or Diagonal for video.</p>
+                        <div x-show="usesSplit" x-cloak>
+                            <p class="mb-1.5 text-xs font-medium text-lumis-ink">Transition</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in videoTransitionOptions" :key="option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(videoTransition === option.id)"
+                                        @click="stopVideoPreview(); videoTransition = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
                         <div x-show="usesSplit" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">Container</p>
                             <div class="flex flex-wrap gap-1.5">

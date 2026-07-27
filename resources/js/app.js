@@ -57,6 +57,7 @@ document.addEventListener('alpine:init', () => {
         videoFps: 30,
         videoReverse: false,
         videoContainer: 'auto',
+        videoTransition: 'wipe',
         videoPreviewing: false,
         _videoPreviewToken: 0,
         exporting: false,
@@ -73,6 +74,14 @@ document.addEventListener('alpine:init', () => {
             { id: 'auto', label: 'Auto' },
             { id: 'mp4', label: 'MP4' },
             { id: 'webm', label: 'WebM' },
+        ],
+
+        videoTransitionOptions: [
+            { id: 'wipe', label: 'Wipe' },
+            { id: 'dissolve', label: 'Dissolve' },
+            { id: 'push', label: 'Push' },
+            { id: 'iris', label: 'Iris' },
+            { id: 'reveal', label: 'Reveal' },
         ],
 
         presets: [],
@@ -312,10 +321,9 @@ document.addEventListener('alpine:init', () => {
                     }
 
                     const t = i / frameCount;
-                    const split = this.videoReverse ? 1 - t : t;
+                    const progress = this.videoReverse ? 1 - t : t;
                     const options = this.buildOptions(this.baseWidth, this.baseHeight);
-                    options.splitPosition = clamp(split, 0, 1);
-                    this.compositor.render(options);
+                    this.compositor.renderVideoFrame(options, this.videoTransition, clamp(progress, 0, 1));
 
                     if (preview) {
                         this.previewMetrics = this.compositor.drawPreview(preview);
@@ -381,6 +389,7 @@ document.addEventListener('alpine:init', () => {
                 videoFps: this.videoFps,
                 videoReverse: this.videoReverse,
                 videoContainer: this.videoContainer,
+                videoTransition: this.videoTransition,
             };
         },
 
@@ -484,6 +493,10 @@ document.addEventListener('alpine:init', () => {
             }
             if (['auto', 'mp4', 'webm'].includes(settings.videoContainer)) {
                 this.videoContainer = settings.videoContainer;
+            }
+            const transitions = new Set(this.videoTransitionOptions.map((item) => item.id));
+            if (transitions.has(settings.videoTransition)) {
+                this.videoTransition = settings.videoTransition;
             }
 
             this.previewTool = this.layout === 'diagonal' ? 'angle' : 'position';
@@ -802,15 +815,16 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async recordWipeVideo(width, height) {
-            const { recordWipeVideo } = await this.loadVideoExport();
-            return recordWipeVideo({
+        async recordTransitionVideo(width, height) {
+            const { recordTransitionVideo } = await this.loadVideoExport();
+            return recordTransitionVideo({
                 width,
                 height,
                 videoContainer: this.videoContainer,
                 videoFps: this.videoFps,
                 videoDuration: this.videoDuration,
                 videoReverse: this.videoReverse,
+                videoTransition: this.videoTransition,
                 compositor: this.compositor,
                 buildOptions: (w, h) => this.buildOptions(w, h),
                 onProgress: (message) => {
@@ -1082,7 +1096,7 @@ document.addEventListener('alpine:init', () => {
 
                     const { width, height } = this.resolveVideoSize();
                     this.statusMessage = 'Recording video…';
-                    const { blob, extension, label } = await this.recordWipeVideo(width, height);
+                    const { blob, extension, label } = await this.recordTransitionVideo(width, height);
                     this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${extension}`);
                     this.statusMessage = `Exported ${label} (${width} × ${height}).`;
                     return;
