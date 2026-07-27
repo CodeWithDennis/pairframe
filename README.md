@@ -1,8 +1,8 @@
 # Pairframe
 
-NativePHP desktop app to compose two screenshots into split or overlap thumbnails, with background patterns and PNG, JPG, or transition-video export.
+NativePHP desktop app to compose two screenshots into split or overlap thumbnails, with background patterns, overlays, and PNG, JPG, GIF, or transition-video export.
 
-![Pairframe desktop app with diagonal wavy split preview and video export selected](docs/pairframe.png)
+![Pairframe desktop app with split preview, collapsible sidebars, and export controls](docs/pairframe.png)
 
 **Heads up: this project is AI-assisted.** A lot of the code and docs were written with AI tools (reviewed and steered by me). Pairframe exists first for my own thumbnail workflow; I open-sourced it in case it helps someone else. Issues and pull requests are welcome, just know what you're looking at.
 
