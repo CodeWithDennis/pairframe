@@ -40,6 +40,8 @@ const LABEL_PRESET_ANCHORS = {
 
 const LABEL_PRESET_SET = new Set(LABEL_PRESET_IDS);
 const DEFAULT_DIAGONAL_ANGLE = Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10;
+const HISTORY_LIMIT = 50;
+const HISTORY_DEBOUNCE_MS = 300;
 
 function labelPresetAnchor(preset) {
     return LABEL_PRESET_ANCHORS[preset] || LABEL_PRESET_ANCHORS['bottom-left'];
@@ -155,6 +157,12 @@ document.addEventListener('alpine:init', () => {
         statusMessage: '',
         theme: 'auto',
 
+        historyPast: [],
+        historyFuture: [],
+        _historyPaused: false,
+        _historyTimer: 0,
+        _historyReady: false,
+
         videoFpsOptions: [
             { id: 24, label: '24' },
             { id: 30, label: '30' },
@@ -255,6 +263,9 @@ document.addEventListener('alpine:init', () => {
             this._themeMedia.addEventListener('change', this._onThemeMedia);
             this.loadPanels();
             this.loadPresets();
+            this.historyPast = [this.cloneSettings(this.captureSettings())];
+            this.historyFuture = [];
+            this._historyReady = true;
             this.$watch(
                 () => [
                     this.layout,
@@ -315,10 +326,121 @@ document.addEventListener('alpine:init', () => {
                     this.scheduleRender();
                 },
             );
+            this.$watch(
+                () => JSON.stringify(this.captureSettings()),
+                () => {
+                    if (!this._historyReady) {
+                        return;
+                    }
+                    this.scheduleHistoryCommit();
+                },
+            );
 
             this.$nextTick(() => this.scheduleRender());
             this._onResize = () => this.updateHandle();
             window.addEventListener('resize', this._onResize);
+            this._onHistoryKeydown = (event) => this.handleHistoryShortcut(event);
+            window.addEventListener('keydown', this._onHistoryKeydown);
+        },
+
+        cloneSettings(settings) {
+            return JSON.parse(JSON.stringify(settings || {}));
+        },
+
+        get canUndo() {
+            return this.historyPast.length > 1;
+        },
+
+        get canRedo() {
+            return this.historyFuture.length > 0;
+        },
+
+        scheduleHistoryCommit() {
+            if (this._historyPaused || this.exporting || this.videoPreviewing || !this._historyReady) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+            }
+            this._historyTimer = setTimeout(() => {
+                this._historyTimer = 0;
+                this.commitHistoryNow();
+            }, HISTORY_DEBOUNCE_MS);
+        },
+
+        commitHistoryNow() {
+            if (this._historyPaused || this.exporting || this.videoPreviewing || !this._historyReady) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
+            const snap = this.cloneSettings(this.captureSettings());
+            const last = this.historyPast[this.historyPast.length - 1];
+            if (last && JSON.stringify(last) === JSON.stringify(snap)) {
+                return;
+            }
+            this.historyPast.push(snap);
+            if (this.historyPast.length > HISTORY_LIMIT) {
+                this.historyPast.splice(0, this.historyPast.length - HISTORY_LIMIT);
+            }
+            this.historyFuture = [];
+        },
+
+        undo() {
+            if (!this.canUndo) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
+            this._historyPaused = true;
+            const current = this.historyPast.pop();
+            this.historyFuture.push(current);
+            const previous = this.historyPast[this.historyPast.length - 1];
+            this.applySettings(this.cloneSettings(previous));
+            this._historyPaused = false;
+            this.scheduleRender();
+        },
+
+        redo() {
+            if (!this.canRedo) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
+            this._historyPaused = true;
+            const next = this.historyFuture.pop();
+            this.historyPast.push(next);
+            this.applySettings(this.cloneSettings(next));
+            this._historyPaused = false;
+            this.scheduleRender();
+        },
+
+        handleHistoryShortcut(event) {
+            const target = event.target;
+            const tag = String(target?.tagName || '').toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+                return;
+            }
+            const mod = event.metaKey || event.ctrlKey;
+            if (!mod) {
+                return;
+            }
+            const key = String(event.key || '').toLowerCase();
+            if (key === 'z' && !event.shiftKey) {
+                event.preventDefault();
+                this.undo();
+                return;
+            }
+            if ((key === 'z' && event.shiftKey) || key === 'y') {
+                event.preventDefault();
+                this.redo();
+            }
         },
 
         scheduleRender() {
@@ -1183,7 +1305,14 @@ document.addEventListener('alpine:init', () => {
             if (!preset?.settings) {
                 return;
             }
+            this._historyPaused = true;
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
             this.applySettings(preset.settings);
+            this._historyPaused = false;
+            this.commitHistoryNow();
             this.activePresetId = preset.id;
             this.statusMessage = `Preset “${preset.name}” applied.`;
             this.closeLoadPresetModal();

@@ -128,6 +128,34 @@
 
             <div class="flex items-center gap-3">
                 <p class="text-xs font-normal text-zinc-400" x-text="statusMessage || exportSizeLabel"></p>
+                <div class="inline-flex gap-1" role="group" aria-label="History">
+                    <button
+                        type="button"
+                        class="inline-flex size-8 items-center justify-center border border-lumis-panel-line bg-lumis-panel-surface text-lumis-ink hover:bg-lumis-segment-idle disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Undo"
+                        title="Undo (⌘Z)"
+                        :disabled="!canUndo"
+                        @click="undo()"
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 14 4 9l5-5" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 9h10.5a5.5 5.5 0 1 1 0 11H13" />
+                        </svg>
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex size-8 items-center justify-center border border-lumis-panel-line bg-lumis-panel-surface text-lumis-ink hover:bg-lumis-segment-idle disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Redo"
+                        title="Redo (⌘⇧Z)"
+                        :disabled="!canRedo"
+                        @click="redo()"
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m15 14 5-5-5-5" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 9H9.5a5.5 5.5 0 1 0 0 11H11" />
+                        </svg>
+                    </button>
+                </div>
                 <div class="inline-flex gap-1" role="group" aria-label="Theme">
                     <button
                         type="button"
