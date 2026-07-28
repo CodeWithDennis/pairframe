@@ -22,27 +22,25 @@ function hexToRgb(hex) {
     };
 }
 
-export function paintBackground(ctx, width, height, options = {}) {
-    const type = options.type || 'solid';
-    const bg = options.bg || '#FAFAFA';
-    const fg = options.fg || '#E5E5E5';
-    const density = clamp(Number(options.density) || 24, 4, 120);
+/** Deterministic 0..1 noise so wipe frames and cached tiles do not flicker. */
+function hashNoise(n) {
+    let x = Math.imul(Number(n) ^ 0x9e3779b9, 0x85ebca6b);
+    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+    x = (x ^ (x >>> 16)) >>> 0;
+    return x / 4294967296;
+}
 
-    ctx.save();
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, width, height);
-
-    if (type === 'solid') {
-        ctx.restore();
-        return;
-    }
-
-    ctx.fillStyle = fg;
-    ctx.strokeStyle = fg;
+/**
+ * Draw pattern marks only (no opaque base). Used by background + overlay.
+ * @param {'opaque'|'grain'} noiseMode opaque blends two colors; grain uses color alpha speckles
+ */
+function paintPatternMarks(ctx, width, height, type, color, density, noiseMode = 'opaque', noiseBg = null) {
+    const step = density;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1;
 
     if (type === 'dots') {
-        const step = density;
         const radius = Math.max(1, density * 0.12);
         for (let y = step / 2; y < height; y += step) {
             for (let x = step / 2; x < width; x += step) {
@@ -51,8 +49,10 @@ export function paintBackground(ctx, width, height, options = {}) {
                 ctx.fill();
             }
         }
-    } else if (type === 'grid') {
-        const step = density;
+        return;
+    }
+
+    if (type === 'grid') {
         ctx.beginPath();
         for (let x = 0; x <= width; x += step) {
             ctx.moveTo(x + 0.5, 0);
@@ -63,13 +63,17 @@ export function paintBackground(ctx, width, height, options = {}) {
             ctx.lineTo(width, y + 0.5);
         }
         ctx.stroke();
-    } else if (type === 'stripes') {
-        const step = density;
+        return;
+    }
+
+    if (type === 'stripes') {
         for (let x = -height; x < width; x += step) {
             ctx.fillRect(x, 0, Math.max(2, step * 0.45), height);
         }
-    } else if (type === 'diagonal') {
-        const step = density;
+        return;
+    }
+
+    if (type === 'diagonal') {
         ctx.lineWidth = Math.max(1, step * 0.2);
         ctx.beginPath();
         for (let i = -height; i < width + height; i += step) {
@@ -77,8 +81,10 @@ export function paintBackground(ctx, width, height, options = {}) {
             ctx.lineTo(i + height, height);
         }
         ctx.stroke();
-    } else if (type === 'chevron') {
-        const step = density;
+        return;
+    }
+
+    if (type === 'chevron') {
         const amp = step * 0.45;
         ctx.lineWidth = Math.max(1.5, step * 0.12);
         ctx.beginPath();
@@ -91,7 +97,10 @@ export function paintBackground(ctx, width, height, options = {}) {
             }
         }
         ctx.stroke();
-    } else if (type === 'noise') {
+        return;
+    }
+
+    if (type === 'noise') {
         const tileSize = 128;
         const tile = document.createElement('canvas');
         tile.width = tileSize;
@@ -99,16 +108,27 @@ export function paintBackground(ctx, width, height, options = {}) {
         const tctx = tile.getContext('2d');
         const image = tctx.createImageData(tileSize, tileSize);
         const data = image.data;
-        const bgRgb = hexToRgb(bg) || { r: 250, g: 250, b: 250 };
-        const fgRgb = hexToRgb(fg) || { r: 229, g: 229, b: 229 };
+        const fgRgb = hexToRgb(color) || { r: 229, g: 229, b: 229 };
         const strength = clamp(density / 100, 0.08, 0.9);
-        for (let i = 0; i < data.length; i += 4) {
-            const t = Math.random() * strength;
-            data[i] = Math.round(bgRgb.r * (1 - t) + fgRgb.r * t);
-            data[i + 1] = Math.round(bgRgb.g * (1 - t) + fgRgb.g * t);
-            data[i + 2] = Math.round(bgRgb.b * (1 - t) + fgRgb.b * t);
-            data[i + 3] = 255;
+
+        if (noiseMode === 'grain') {
+            for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
+                data[i] = fgRgb.r;
+                data[i + 1] = fgRgb.g;
+                data[i + 2] = fgRgb.b;
+                data[i + 3] = Math.round(hashNoise(p + 17) * strength * 255);
+            }
+        } else {
+            const bgRgb = hexToRgb(noiseBg) || { r: 250, g: 250, b: 250 };
+            for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
+                const t = hashNoise(p + 3) * strength;
+                data[i] = Math.round(bgRgb.r * (1 - t) + fgRgb.r * t);
+                data[i + 1] = Math.round(bgRgb.g * (1 - t) + fgRgb.g * t);
+                data[i + 2] = Math.round(bgRgb.b * (1 - t) + fgRgb.b * t);
+                data[i + 3] = 255;
+            }
         }
+
         tctx.putImageData(image, 0, 0);
         const pattern = ctx.createPattern(tile, 'repeat');
         if (pattern) {
@@ -116,7 +136,42 @@ export function paintBackground(ctx, width, height, options = {}) {
             ctx.fillRect(0, 0, width, height);
         }
     }
+}
 
+export function paintBackground(ctx, width, height, options = {}) {
+    const type = options.type || 'none';
+    const bg = options.bg || '#FAFAFA';
+    const fg = options.fg || '#E5E5E5';
+    const density = clamp(Number(options.density) || 24, 4, 120);
+
+    ctx.save();
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, width, height);
+
+    if (type && type !== 'none' && type !== 'solid') {
+        paintPatternMarks(ctx, width, height, type, fg, density, 'opaque', bg);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Translucent pattern marks on top of composed images (no base fill).
+ * options: { type, color, opacity (0-100), density }
+ */
+export function paintOverlay(ctx, width, height, options = {}) {
+    const type = options.type || 'none';
+    if (!type || type === 'none' || type === 'solid') {
+        return;
+    }
+
+    const color = options.color || '#171717';
+    const opacity = clamp((Number(options.opacity) ?? 25) / 100, 0.05, 0.8);
+    const density = clamp(Number(options.density) || 24, 4, 120);
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    paintPatternMarks(ctx, width, height, type, color, density, 'grain');
     ctx.restore();
 }
 
@@ -133,14 +188,6 @@ function blurMask(maskCtx, width, height, softEdge) {
     maskCtx.filter = `blur(${Math.min(softEdge / 2, 48)}px)`;
     maskCtx.drawImage(temp, 0, 0);
     maskCtx.filter = 'none';
-}
-
-/** Deterministic 0..1 noise so wipe frames do not flicker. */
-function hashNoise(n) {
-    let x = Math.imul(Number(n) ^ 0x9e3779b9, 0x85ebca6b);
-    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
-    x = (x ^ (x >>> 16)) >>> 0;
-    return x / 4294967296;
 }
 
 /**

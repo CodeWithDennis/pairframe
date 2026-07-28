@@ -86,7 +86,7 @@
         }
     </style>
 </head>
-<body class="h-dvh overflow-hidden bg-lumis-canvas font-sans font-normal text-lumis-ink" x-data="pairframe">
+<body class="h-full overflow-hidden bg-lumis-canvas font-sans font-normal text-lumis-ink" x-data="pairframe">
     {{-- Shown before Vite/Alpine are ready --}}
     <div id="boot-screen" aria-live="polite" aria-busy="true">
         <svg class="boot-mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
@@ -105,7 +105,7 @@
         <div class="boot-bar" aria-hidden="true"><i></i></div>
     </div>
 
-    <div class="flex h-dvh flex-col">
+    <div class="flex h-full flex-col">
         {{-- Header --}}
         <header class="flex h-14 shrink-0 items-center justify-between border-b border-lumis-panel-line bg-lumis-panel-surface px-5">
             <a href="/" class="group flex items-center gap-2.5 text-lumis-ink" aria-label="Pairframe">
@@ -128,6 +128,34 @@
 
             <div class="flex items-center gap-3">
                 <p class="text-xs font-normal text-zinc-400" x-text="statusMessage || exportSizeLabel"></p>
+                <div class="inline-flex gap-1" role="group" aria-label="History">
+                    <button
+                        type="button"
+                        class="inline-flex size-8 items-center justify-center border border-lumis-panel-line bg-lumis-panel-surface text-lumis-ink hover:bg-lumis-segment-idle disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Undo"
+                        title="Undo (⌘Z)"
+                        :disabled="!canUndo"
+                        @click="undo()"
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 14 4 9l5-5" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 9h10.5a5.5 5.5 0 1 1 0 11H13" />
+                        </svg>
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex size-8 items-center justify-center border border-lumis-panel-line bg-lumis-panel-surface text-lumis-ink hover:bg-lumis-segment-idle disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Redo"
+                        title="Redo (⌘⇧Z)"
+                        :disabled="!canRedo"
+                        @click="redo()"
+                    >
+                        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m15 14 5-5-5-5" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 9H9.5a5.5 5.5 0 1 0 0 11H11" />
+                        </svg>
+                    </button>
+                </div>
                 <div class="inline-flex gap-1" role="group" aria-label="Theme">
                     <button
                         type="button"
@@ -194,11 +222,35 @@
         </header>
 
         {{-- Workspace: left tools | preview | right tools --}}
-        <div class="flex min-h-0 flex-1">
+        <div class="relative min-h-0 flex-1">
+            <div class="absolute inset-0 flex overflow-hidden">
             {{-- Left: layout + split + switches --}}
-            <aside class="flex w-[240px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-lumis-panel-line bg-lumis-panel-surface px-4 py-4">
-                <section>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Layout</h2>
+            <aside class="flex h-full w-[240px] shrink-0 flex-col border-r border-lumis-panel-line bg-lumis-panel-surface">
+                <div class="sidebar-scroll">
+                <section class="sidebar-group" :class="panelOpen.layout ? 'is-open' : 'is-collapsed'">
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('layout')"
+                            :aria-expanded="panelOpen.layout.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Layout</h2>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.layout && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('layout')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Layout"
+                            @click="resetGroup('layout')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="sidebar-group-body" x-show="panelOpen.layout" x-cloak>
                     <div class="flex flex-wrap gap-1.5">
                         <template x-for="option in layouts" :key="option.id">
                             <button
@@ -243,7 +295,7 @@
                         <div x-show="layout === 'diagonal'" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Angle</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="-180"
@@ -285,7 +337,7 @@
                         <div x-show="showsOverlapOffset" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Offset</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="0"
@@ -302,13 +354,37 @@
                             <input type="range" min="0" max="40" step="1" class="w-full" x-model.number="overlapOffset">
                         </div>
                     </div>
+                    </div>
                 </section>
 
-                <section x-show="usesSplit" x-cloak>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Split</h2>
+                <section class="sidebar-group" x-show="usesSplit" x-cloak :class="panelOpen.split ? 'is-open' : 'is-collapsed'">
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('split')"
+                            :aria-expanded="panelOpen.split.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Split</h2>
+                        <span class="text-xs text-zinc-400" x-show="!panelOpen.split" x-cloak x-text="Math.round(splitPosition) + '%'"></span>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.split && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('split')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Split"
+                            @click="resetGroup('split')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="sidebar-group-body" x-show="panelOpen.split" x-cloak>
                     <div class="mb-1 flex items-center justify-between gap-2">
                         <label class="text-xs font-medium text-lumis-ink">Position</label>
-                        <div class="flex items-center text-xs text-zinc-400">
+                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                             <input
                                 type="number"
                                 min="0"
@@ -323,17 +399,40 @@
                         </div>
                     </div>
                     <input type="range" min="0" max="100" step="0.1" class="w-full" x-model.number="splitPosition">
+                    </div>
                 </section>
 
-                <section>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Adjust</h2>
+                <section class="sidebar-group" :class="panelOpen.adjust ? 'is-open' : 'is-collapsed'">
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('adjust')"
+                            :aria-expanded="panelOpen.adjust.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Adjust</h2>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.adjust && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('adjust')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Adjust"
+                            @click="resetGroup('adjust')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="sidebar-group-body" x-show="panelOpen.adjust" x-cloak>
                     <div class="mb-3 flex flex-wrap gap-1.5">
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(swapSides)" @click="swapSides = !swapSides">Swap sides</button>
                     </div>
                     <div class="mb-3" x-show="usesSplit" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Padding</label>
-                            <div class="flex items-center text-xs text-zinc-400">
+                            <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                 <input
                                     type="number"
                                     min="0"
@@ -352,7 +451,7 @@
                     <div>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Radius</label>
-                            <div class="flex items-center text-xs text-zinc-400">
+                            <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                 <input
                                     type="number"
                                     min="0"
@@ -368,64 +467,157 @@
                         </div>
                         <input type="range" min="0" max="50" step="0.5" class="w-full" x-model.number="imageRadius">
                     </div>
+                    </div>
                 </section>
 
-                <section>
-                    <h2 class="mb-2 text-sm font-semibold tracking-tight text-lumis-display">Labels</h2>
+                <section class="sidebar-group" :class="panelOpen.labels ? 'is-open' : 'is-collapsed'">
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('labels')"
+                            :aria-expanded="panelOpen.labels.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Labels</h2>
+                        <span class="text-xs text-zinc-400" x-show="!panelOpen.labels" x-cloak x-text="labelsEnabled ? 'On' : 'Off'"></span>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.labels && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('labels')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Labels"
+                            @click="resetGroup('labels')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="sidebar-group-body" x-show="panelOpen.labels" x-cloak>
                     <div class="mb-3 flex flex-wrap gap-1.5">
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(!labelsEnabled)" @click="labelsEnabled = false">Off</button>
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(labelsEnabled)" @click="labelsEnabled = true">On</button>
                     </div>
-                    <div class="space-y-3" x-show="labelsEnabled" x-cloak>
+                    <div class="space-y-4" x-show="labelsEnabled" x-cloak>
                         <div>
-                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink" x-text="layout === 'horizontal' ? 'Top' : 'Left'"></span>
-                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelLeft" :placeholder="layout === 'horizontal' ? 'Top' : 'Left'">
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="option in labelPositions" :key="'left-' + option.id">
+                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Image A</span>
+                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelA" placeholder="Left">
+                            <div class="label-preset-grid" role="group" aria-label="Image A position">
+                                <template x-for="option in labelPresetOptions" :key="'a-' + option.id">
                                     <button
                                         type="button"
-                                        class="px-2.5 py-1.5 text-xs font-medium"
-                                        :class="segmentClass(labelLeftPosition === option.id)"
-                                        @click="labelLeftPosition = option.id"
-                                        x-text="layout === 'horizontal' ? option.labelHorizontal : option.label"
+                                        class="label-preset-cell"
+                                        :class="segmentClass(labelAMode === 'preset' && labelAPreset === option.id)"
+                                        @click="setLabelPreset('a', option.id)"
+                                        :title="option.id"
+                                        x-text="option.short"
                                     ></button>
                                 </template>
                             </div>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">X</label>
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelAX" @input="setLabelAxis('a', 'x', labelAX)" @blur="clampLabelAxis('a', 'x')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelAX" @input="setLabelAxis('a', 'x', labelAX)">
+                                </div>
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">Y</label>
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelAY" @input="setLabelAxis('a', 'y', labelAY)" @blur="clampLabelAxis('a', 'y')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelAY" @input="setLabelAxis('a', 'y', labelAY)">
+                                </div>
+                            </div>
                         </div>
                         <div>
-                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink" x-text="layout === 'horizontal' ? 'Bottom' : 'Right'"></span>
-                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelRight" :placeholder="layout === 'horizontal' ? 'Bottom' : 'Right'">
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="option in labelPositions" :key="'right-' + option.id">
+                            <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Image B</span>
+                            <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelB" placeholder="Right">
+                            <div class="label-preset-grid" role="group" aria-label="Image B position">
+                                <template x-for="option in labelPresetOptions" :key="'b-' + option.id">
                                     <button
                                         type="button"
-                                        class="px-2.5 py-1.5 text-xs font-medium"
-                                        :class="segmentClass(labelRightPosition === option.id)"
-                                        @click="labelRightPosition = option.id"
-                                        x-text="layout === 'horizontal' ? option.labelHorizontal : option.label"
+                                        class="label-preset-cell"
+                                        :class="segmentClass(labelBMode === 'preset' && labelBPreset === option.id)"
+                                        @click="setLabelPreset('b', option.id)"
+                                        :title="option.id"
+                                        x-text="option.short"
                                     ></button>
                                 </template>
+                            </div>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">X</label>
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBX" @input="setLabelAxis('b', 'x', labelBX)" @blur="clampLabelAxis('b', 'x')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBX" @input="setLabelAxis('b', 'x', labelBX)">
+                                </div>
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">Y</label>
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBY" @input="setLabelAxis('b', 'y', labelBY)" @blur="clampLabelAxis('b', 'y')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBY" @input="setLabelAxis('b', 'y', labelBY)">
+                                </div>
                             </div>
                         </div>
                         <div>
                             <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Badge</span>
                             <input type="text" maxlength="40" class="label-text-input mb-1.5 w-full" x-model="labelBadge" placeholder="v1.0">
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="option in labelPositions" :key="'badge-' + option.id">
+                            <div class="label-preset-grid" role="group" aria-label="Badge position">
+                                <template x-for="option in labelPresetOptions" :key="'badge-' + option.id">
                                     <button
                                         type="button"
-                                        class="px-2.5 py-1.5 text-xs font-medium"
-                                        :class="segmentClass(labelBadgePosition === option.id)"
-                                        @click="labelBadgePosition = option.id"
-                                        x-text="option.label"
+                                        class="label-preset-cell"
+                                        :class="segmentClass(labelBadgeMode === 'preset' && labelBadgePreset === option.id)"
+                                        @click="setLabelPreset('badge', option.id)"
+                                        :title="option.id"
+                                        x-text="option.short"
                                     ></button>
                                 </template>
+                            </div>
+                            <div class="mt-2 space-y-2">
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">X</label>
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBadgeX" @input="setLabelAxis('badge', 'x', labelBadgeX)" @blur="clampLabelAxis('badge', 'x')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBadgeX" @input="setLabelAxis('badge', 'x', labelBadgeX)">
+                                </div>
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-2">
+                                        <label class="text-xs font-medium text-lumis-ink">Y</label>
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                            <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBadgeY" @input="setLabelAxis('badge', 'y', labelBadgeY)" @blur="clampLabelAxis('badge', 'y')" @keydown.enter="$event.target.blur()">
+                                            <span>%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="labelBadgeY" @input="setLabelAxis('badge', 'y', labelBadgeY)">
+                                </div>
                             </div>
                         </div>
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Size</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="50"
@@ -442,12 +634,14 @@
                             <input type="range" min="50" max="160" step="1" class="w-full" x-model.number="labelSize">
                         </div>
                     </div>
+                    </div>
                 </section>
+                </div>
             </aside>
 
             {{-- Center preview / upload --}}
             <main
-                class="flex min-h-0 min-w-0 flex-1 flex-col bg-lumis-canvas"
+                class="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-lumis-canvas"
                 x-ref="previewStage"
                 @dragover.prevent="onDragOver($event)"
                 @dragleave.prevent="onDragLeave($event)"
@@ -540,35 +734,69 @@
                 </div>
             </main>
 
-            {{-- Right: background + export --}}
-            <aside class="flex w-[240px] shrink-0 flex-col gap-5 overflow-hidden border-l border-lumis-panel-line bg-lumis-panel-surface px-4 py-4">
-                <section>
-                    <div class="mb-2 flex items-baseline justify-between">
-                        <h2 class="text-sm font-semibold tracking-tight text-lumis-display">Background</h2>
-                        <span class="text-xs text-zinc-400">Export</span>
+            {{-- Right: background + overlay + export --}}
+            <aside class="flex h-full w-[240px] shrink-0 flex-col border-l border-lumis-panel-line bg-lumis-panel-surface">
+                <div class="sidebar-scroll">
+                <section class="sidebar-group" :class="panelOpen.background ? 'is-open' : 'is-collapsed'">
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('background')"
+                            :aria-expanded="panelOpen.background.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Background</h2>
+                        <span class="text-xs capitalize text-zinc-400" x-show="!panelOpen.background" x-cloak x-text="backgroundSummary"></span>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.background && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('background')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Background"
+                            @click="resetGroup('background')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
                     </div>
-                    <div class="flex flex-wrap gap-1.5">
+                    <div class="sidebar-group-body" x-show="panelOpen.background" x-cloak>
+                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
+                        <span class="font-medium">Per side</span>
+                        <input
+                            type="checkbox"
+                            class="size-3.5 accent-lumis-ink"
+                            :checked="backgroundPerSide"
+                            @change="setBackgroundPerSide($event.target.checked)"
+                        >
+                    </label>
+                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="backgroundPerSide" x-cloak>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(backgroundEditSide === 'a')" @click="backgroundEditSide = 'a'">A</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(backgroundEditSide === 'b')" @click="backgroundEditSide = 'b'">B</button>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-1.5">
                         <template x-for="option in backgroundOptions" :key="option.id">
                             <button
                                 type="button"
                                 class="px-2.5 py-1.5 text-xs font-medium"
-                                :class="segmentClass(backgroundType === option.id)"
-                                @click="backgroundType = option.id"
+                                :class="segmentClass(activeBackgroundType === option.id)"
+                                @click="activeBackgroundType = option.id"
                                 x-text="option.label"
                             ></button>
                         </template>
                     </div>
                     <div class="mt-3 flex items-center gap-3">
                         <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                            <input type="color" x-model="backgroundBg">
+                            <input type="color" x-model="activeBackgroundBg">
                             Base
                         </label>
-                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" x-show="backgroundType !== 'solid'" x-cloak>
-                            <input type="color" x-model="backgroundFg">
+                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" x-show="activeBackgroundType !== 'none'" x-cloak>
+                            <input type="color" x-model="activeBackgroundFg">
                             Pattern
                         </label>
                     </div>
-                    <div class="mt-3" x-show="backgroundType !== 'solid'" x-cloak>
+                    <div class="mt-3" x-show="activeBackgroundType !== 'none'" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Density</label>
                             <input
@@ -577,22 +805,135 @@
                                 max="80"
                                 step="1"
                                 class="slider-value"
-                                x-model.number="backgroundDensity"
-                                @blur="clampSlider('backgroundDensity', 8, 80)"
+                                x-model.number="activeBackgroundDensity"
+                                @blur="clampActiveBackgroundDensity()"
                                 @keydown.enter="$event.target.blur()"
                             >
                         </div>
-                        <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="backgroundDensity">
+                        <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="activeBackgroundDensity">
+                    </div>
                     </div>
                 </section>
 
-                <section>
-                    <div class="mb-2 flex items-baseline justify-between">
-                        <h2 class="text-sm font-semibold tracking-tight text-lumis-display">Export</h2>
-                        <span class="text-xs text-zinc-400" x-text="exportSizeLabel"></span>
+                <section class="sidebar-group" :class="panelOpen.overlay ? 'is-open' : 'is-collapsed'">
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('overlay')"
+                            :aria-expanded="panelOpen.overlay.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Overlay</h2>
+                        <span class="text-xs capitalize text-zinc-400" x-show="!panelOpen.overlay" x-cloak x-text="overlaySummary"></span>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.overlay && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('overlay')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Overlay"
+                            @click="resetGroup('overlay')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
                     </div>
+                    <div class="sidebar-group-body" x-show="panelOpen.overlay" x-cloak>
+                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
+                        <span class="font-medium">Per side</span>
+                        <input
+                            type="checkbox"
+                            class="size-3.5 accent-lumis-ink"
+                            :checked="overlayPerSide"
+                            @change="setOverlayPerSide($event.target.checked)"
+                        >
+                    </label>
+                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="overlayPerSide" x-cloak>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'a')" @click="overlayEditSide = 'a'">A</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'b')" @click="overlayEditSide = 'b'">B</button>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                        <template x-for="option in overlayOptions" :key="option.id">
+                            <button
+                                type="button"
+                                class="px-2.5 py-1.5 text-xs font-medium"
+                                :class="segmentClass(activeOverlayType === option.id)"
+                                @click="activeOverlayType = option.id"
+                                x-text="option.label"
+                            ></button>
+                        </template>
+                    </div>
+                    <div class="mt-3 space-y-3" x-show="activeOverlayType !== 'none'" x-cloak>
+                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                            <input type="color" x-model="activeOverlayColor">
+                            Color
+                        </label>
+                        <div>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Opacity</label>
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="5"
+                                        max="80"
+                                        step="1"
+                                        class="slider-value"
+                                        x-model.number="activeOverlayOpacity"
+                                        @blur="clampActiveOverlayOpacity()"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            <input type="range" min="5" max="80" step="1" class="w-full" x-model.number="activeOverlayOpacity">
+                        </div>
+                        <div>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Density</label>
+                                <input
+                                    type="number"
+                                    min="8"
+                                    max="80"
+                                    step="1"
+                                    class="slider-value"
+                                    x-model.number="activeOverlayDensity"
+                                    @blur="clampActiveOverlayDensity()"
+                                    @keydown.enter="$event.target.blur()"
+                                >
+                            </div>
+                            <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="activeOverlayDensity">
+                        </div>
+                    </div>
+                    </div>
+                </section>
 
-                    <div class="mb-3" x-show="exportFormat !== 'video'" x-cloak>
+                <section class="sidebar-group" :class="panelOpen.export ? 'is-open' : 'is-collapsed'">
+                    <div class="sidebar-group-header">
+                        <button
+                            type="button"
+                            class="sidebar-group-toggle"
+                            @click="togglePanel('export')"
+                            :aria-expanded="panelOpen.export.toString()"
+                        >
+                            <h2 class="min-w-0 flex-1 text-xs font-semibold tracking-tight text-lumis-display">Export</h2>
+                            <svg class="h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-150" :class="panelOpen.export && 'rotate-180'" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="sidebar-group-reset"
+                            x-show="groupDirty('export')"
+                            x-cloak
+                            title="Reset"
+                            aria-label="Reset Export"
+                            @click="resetGroup('export')"
+                        >
+                            <svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="sidebar-group-body" x-show="panelOpen.export" x-cloak>
+
+                    <div class="mb-3" x-show="!usesMotionExport" x-cloak>
                         <p class="mb-2 text-xs font-medium text-lumis-ink">Scale</p>
                         <div class="flex flex-wrap gap-1.5">
                             <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportScale === '1')" @click="exportScale = '1'">1×</button>
@@ -603,8 +944,8 @@
 
                     <p class="mb-2 text-xs font-medium text-lumis-ink">Format</p>
                     <div class="mb-3 flex flex-wrap gap-1.5">
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'png')" @click="stopVideoPreview(); exportFormat = 'png'">PNG</button>
-                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'jpg')" @click="stopVideoPreview(); exportFormat = 'jpg'">JPG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'png')" @click="selectExportFormat('png')">PNG</button>
+                        <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(exportFormat === 'jpg')" @click="selectExportFormat('jpg')">JPG</button>
                         <button
                             type="button"
                             class="px-2.5 py-1.5 text-xs font-medium"
@@ -612,12 +953,19 @@
                             :title="usesSplit ? 'Transition video at source resolution' : 'Video needs a split layout'"
                             @click="selectExportFormat('video')"
                         >Video</button>
+                        <button
+                            type="button"
+                            class="px-2.5 py-1.5 text-xs font-medium"
+                            :class="segmentClass(exportFormat === 'gif')"
+                            :title="usesSplit ? 'Animated GIF at source resolution' : 'GIF needs a split layout'"
+                            @click="selectExportFormat('gif')"
+                        >GIF</button>
                     </div>
 
                     <div x-show="exportFormat === 'jpg'" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">JPG quality</label>
-                            <div class="flex items-center text-xs text-zinc-400">
+                            <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                 <input
                                     type="number"
                                     min="50"
@@ -634,9 +982,9 @@
                         <input type="range" min="50" max="100" step="1" class="w-full" x-model.number="jpgQuality">
                     </div>
 
-                    <div class="mt-3 space-y-3" x-show="exportFormat === 'video'" x-cloak>
-                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak>Transition · source resolution</p>
-                        <p class="text-xs text-lumis-status-uploading" x-show="!usesSplit" x-cloak>Switch to Vertical, Horizontal, or Diagonal for video.</p>
+                    <div class="mt-3 space-y-3" x-show="usesMotionExport" x-cloak>
+                        <p class="text-xs text-zinc-400" x-show="usesSplit" x-cloak x-text="exportFormat === 'gif' ? 'Animated GIF · source resolution' : 'Transition · source resolution'"></p>
+                        <p class="text-xs text-lumis-status-uploading" x-show="!usesSplit" x-cloak>Switch to Vertical, Horizontal, or Diagonal for motion export.</p>
                         <div x-show="usesSplit" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">Transition</p>
                             <div class="flex flex-wrap gap-1.5">
@@ -651,7 +999,7 @@
                                 </template>
                             </div>
                         </div>
-                        <div x-show="usesSplit" x-cloak>
+                        <div x-show="usesSplit && exportFormat === 'video'" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">Container</p>
                             <div class="flex flex-wrap gap-1.5">
                                 <template x-for="option in videoContainerOptions" :key="option.id">
@@ -668,9 +1016,23 @@
                             </div>
                         </div>
                         <div x-show="usesSplit" x-cloak>
+                            <p class="mb-1.5 text-xs font-medium text-lumis-ink">Easing</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in videoEasingOptions" :key="option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(videoEasing === option.id)"
+                                        @click="stopVideoPreview(); videoEasing = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Duration</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="1"
@@ -685,6 +1047,44 @@
                                 </div>
                             </div>
                             <input type="range" min="1" max="6" step="0.5" class="w-full" x-model.number="videoDuration">
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Hold start</label>
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="2"
+                                        step="0.05"
+                                        class="slider-value"
+                                        x-model.number="videoHoldStart"
+                                        @blur="clampSlider('videoHoldStart', 0, 2)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>s</span>
+                                </div>
+                            </div>
+                            <input type="range" min="0" max="2" step="0.05" class="w-full" x-model.number="videoHoldStart">
+                        </div>
+                        <div x-show="usesSplit" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Hold end</label>
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="2"
+                                        step="0.05"
+                                        class="slider-value"
+                                        x-model.number="videoHoldEnd"
+                                        @blur="clampSlider('videoHoldEnd', 0, 2)"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>s</span>
+                                </div>
+                            </div>
+                            <input type="range" min="0" max="2" step="0.05" class="w-full" x-model.number="videoHoldEnd">
                         </div>
                         <div x-show="usesSplit" x-cloak>
                             <p class="mb-1.5 text-xs font-medium text-lumis-ink">FPS</p>
@@ -716,8 +1116,11 @@
                             ></button>
                         </div>
                     </div>
+                    </div>
                 </section>
+                </div>
             </aside>
+            </div>
         </div>
     </div>
 
@@ -834,7 +1237,7 @@
             aria-labelledby="preset-modal-title"
         >
             <h2 id="preset-modal-title" class="text-sm font-semibold tracking-tight text-lumis-display">Save preset</h2>
-            <p class="mt-1 text-xs text-zinc-400">Stores layout, split, labels, background, and export settings — not images.</p>
+            <p class="mt-1 text-xs text-zinc-400">Stores layout, split, labels, background, overlay, and export settings — not images.</p>
             <label class="mt-4 block">
                 <span class="mb-1.5 block text-xs font-medium text-lumis-ink">Name</span>
                 <input

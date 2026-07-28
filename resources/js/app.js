@@ -3,6 +3,63 @@ import { createCompositor } from './compositor.js';
 
 const PRESETS_STORAGE_KEY = 'pairframe.presets';
 const THEME_STORAGE_KEY = 'pairframe.theme';
+const PANELS_STORAGE_KEY = 'pairframe.panels.v2';
+const DEFAULT_PANELS = {
+    layout: true,
+    split: true,
+    adjust: false,
+    labels: false,
+    background: true,
+    overlay: false,
+    export: true,
+};
+
+const LABEL_PRESET_IDS = [
+    'top-left',
+    'top-center',
+    'top-right',
+    'middle-left',
+    'middle-center',
+    'middle-right',
+    'bottom-left',
+    'bottom-center',
+    'bottom-right',
+];
+
+const LABEL_PRESET_ANCHORS = {
+    'top-left': { x: 0, y: 0 },
+    'top-center': { x: 50, y: 0 },
+    'top-right': { x: 100, y: 0 },
+    'middle-left': { x: 0, y: 50 },
+    'middle-center': { x: 50, y: 50 },
+    'middle-right': { x: 100, y: 50 },
+    'bottom-left': { x: 0, y: 100 },
+    'bottom-center': { x: 50, y: 100 },
+    'bottom-right': { x: 100, y: 100 },
+};
+
+const LABEL_PRESET_SET = new Set(LABEL_PRESET_IDS);
+const DEFAULT_DIAGONAL_ANGLE = Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10;
+const HISTORY_LIMIT = 50;
+const HISTORY_DEBOUNCE_MS = 300;
+
+function labelPresetAnchor(preset) {
+    return LABEL_PRESET_ANCHORS[preset] || LABEL_PRESET_ANCHORS['bottom-left'];
+}
+
+function migrateLegacyLabelPreset(oldPosition, side) {
+    const axis = oldPosition === 'top' || oldPosition === 'middle' || oldPosition === 'bottom' ? oldPosition : null;
+    if (!axis) {
+        return null;
+    }
+    if (side === 'a') {
+        return axis === 'top' ? 'top-left' : axis === 'middle' ? 'middle-left' : 'bottom-left';
+    }
+    if (side === 'b') {
+        return axis === 'top' ? 'top-right' : axis === 'middle' ? 'middle-right' : 'bottom-right';
+    }
+    return axis === 'top' ? 'top-center' : axis === 'middle' ? 'middle-center' : 'bottom-center';
+}
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('pairframe', () => ({
@@ -18,7 +75,7 @@ document.addEventListener('alpine:init', () => {
         baseHeight: 720,
 
         layout: 'vertical',
-        diagonalAngle: Math.round(((Math.atan2(9, 16) * 180) / Math.PI) * 10) / 10,
+        diagonalAngle: DEFAULT_DIAGONAL_ANGLE,
         diagonalStyle: 'straight',
         diagonalDensity: 1.5,
         splitStyle: 'straight',
@@ -32,24 +89,56 @@ document.addEventListener('alpine:init', () => {
         imageRadius: 0,
 
         labelsEnabled: false,
-        labelLeft: 'Left',
-        labelRight: 'Right',
+        labelA: 'Left',
+        labelB: 'Right',
         labelBadge: '',
-        labelLeftPosition: 'bottom',
-        labelRightPosition: 'bottom',
-        labelBadgePosition: 'top',
+        labelAMode: 'preset',
+        labelAPreset: 'bottom-left',
+        labelAX: 0,
+        labelAY: 100,
+        labelBMode: 'preset',
+        labelBPreset: 'bottom-right',
+        labelBX: 100,
+        labelBY: 100,
+        labelBadgeMode: 'preset',
+        labelBadgePreset: 'top-center',
+        labelBadgeX: 50,
+        labelBadgeY: 0,
         labelSize: 100,
 
-        labelPositions: [
-            { id: 'top', label: 'Top', labelHorizontal: 'Left' },
-            { id: 'middle', label: 'Middle', labelHorizontal: 'Center' },
-            { id: 'bottom', label: 'Bottom', labelHorizontal: 'Right' },
+        labelPresetOptions: [
+            { id: 'top-left', short: 'TL' },
+            { id: 'top-center', short: 'TC' },
+            { id: 'top-right', short: 'TR' },
+            { id: 'middle-left', short: 'ML' },
+            { id: 'middle-center', short: 'MC' },
+            { id: 'middle-right', short: 'MR' },
+            { id: 'bottom-left', short: 'BL' },
+            { id: 'bottom-center', short: 'BC' },
+            { id: 'bottom-right', short: 'BR' },
         ],
 
-        backgroundType: 'dots',
+        backgroundType: 'none',
         backgroundBg: '#FAFAFA',
         backgroundFg: '#E5E5E5',
         backgroundDensity: 24,
+        backgroundPerSide: false,
+        backgroundEditSide: 'a',
+        backgroundBType: 'none',
+        backgroundBBg: '#FAFAFA',
+        backgroundBFg: '#E5E5E5',
+        backgroundBDensity: 24,
+
+        overlayType: 'none',
+        overlayColor: '#171717',
+        overlayOpacity: 25,
+        overlayDensity: 24,
+        overlayPerSide: false,
+        overlayEditSide: 'a',
+        overlayBType: 'none',
+        overlayBColor: '#171717',
+        overlayBOpacity: 25,
+        overlayBDensity: 24,
 
         exportScale: '1',
         exportFormat: 'png',
@@ -59,11 +148,20 @@ document.addEventListener('alpine:init', () => {
         videoReverse: false,
         videoContainer: 'auto',
         videoTransition: 'wipe',
+        videoEasing: 'linear',
+        videoHoldStart: 0.25,
+        videoHoldEnd: 0.25,
         videoPreviewing: false,
         _videoPreviewToken: 0,
         exporting: false,
         statusMessage: '',
         theme: 'auto',
+
+        historyPast: [],
+        historyFuture: [],
+        _historyPaused: false,
+        _historyTimer: 0,
+        _historyReady: false,
 
         videoFpsOptions: [
             { id: 24, label: '24' },
@@ -84,6 +182,13 @@ document.addEventListener('alpine:init', () => {
             { id: 'iris', label: 'Iris' },
             { id: 'reveal', label: 'Reveal' },
         ],
+
+        videoEasingOptions: [
+            { id: 'linear', label: 'Linear' },
+            { id: 'ease-in-out', label: 'Ease in-out' },
+        ],
+
+        panelOpen: { ...DEFAULT_PANELS },
 
         presets: [],
         presetName: '',
@@ -125,7 +230,17 @@ document.addEventListener('alpine:init', () => {
         ],
 
         backgroundOptions: [
-            { id: 'solid', label: 'Solid' },
+            { id: 'none', label: 'None' },
+            { id: 'dots', label: 'Dots' },
+            { id: 'grid', label: 'Grid' },
+            { id: 'stripes', label: 'Stripes' },
+            { id: 'diagonal', label: 'Diagonal' },
+            { id: 'chevron', label: 'Chevron' },
+            { id: 'noise', label: 'Noise' },
+        ],
+
+        overlayOptions: [
+            { id: 'none', label: 'None' },
             { id: 'dots', label: 'Dots' },
             { id: 'grid', label: 'Grid' },
             { id: 'stripes', label: 'Stripes' },
@@ -146,7 +261,11 @@ document.addEventListener('alpine:init', () => {
                 }
             };
             this._themeMedia.addEventListener('change', this._onThemeMedia);
+            this.loadPanels();
             this.loadPresets();
+            this.historyPast = [this.cloneSettings(this.captureSettings())];
+            this.historyFuture = [];
+            this._historyReady = true;
             this.$watch(
                 () => [
                     this.layout,
@@ -161,17 +280,40 @@ document.addEventListener('alpine:init', () => {
                     this.imagePadding,
                     this.imageRadius,
                     this.labelsEnabled,
-                    this.labelLeft,
-                    this.labelRight,
+                    this.labelA,
+                    this.labelB,
                     this.labelBadge,
-                    this.labelLeftPosition,
-                    this.labelRightPosition,
-                    this.labelBadgePosition,
+                    this.labelAMode,
+                    this.labelAPreset,
+                    this.labelAX,
+                    this.labelAY,
+                    this.labelBMode,
+                    this.labelBPreset,
+                    this.labelBX,
+                    this.labelBY,
+                    this.labelBadgeMode,
+                    this.labelBadgePreset,
+                    this.labelBadgeX,
+                    this.labelBadgeY,
                     this.labelSize,
                     this.backgroundType,
                     this.backgroundBg,
                     this.backgroundFg,
                     this.backgroundDensity,
+                    this.backgroundPerSide,
+                    this.backgroundBType,
+                    this.backgroundBBg,
+                    this.backgroundBFg,
+                    this.backgroundBDensity,
+                    this.overlayType,
+                    this.overlayColor,
+                    this.overlayOpacity,
+                    this.overlayDensity,
+                    this.overlayPerSide,
+                    this.overlayBType,
+                    this.overlayBColor,
+                    this.overlayBOpacity,
+                    this.overlayBDensity,
                     this.baseWidth,
                     this.baseHeight,
                     this.imageA,
@@ -184,10 +326,121 @@ document.addEventListener('alpine:init', () => {
                     this.scheduleRender();
                 },
             );
+            this.$watch(
+                () => JSON.stringify(this.captureSettings()),
+                () => {
+                    if (!this._historyReady) {
+                        return;
+                    }
+                    this.scheduleHistoryCommit();
+                },
+            );
 
             this.$nextTick(() => this.scheduleRender());
             this._onResize = () => this.updateHandle();
             window.addEventListener('resize', this._onResize);
+            this._onHistoryKeydown = (event) => this.handleHistoryShortcut(event);
+            window.addEventListener('keydown', this._onHistoryKeydown);
+        },
+
+        cloneSettings(settings) {
+            return JSON.parse(JSON.stringify(settings || {}));
+        },
+
+        get canUndo() {
+            return this.historyPast.length > 1;
+        },
+
+        get canRedo() {
+            return this.historyFuture.length > 0;
+        },
+
+        scheduleHistoryCommit() {
+            if (this._historyPaused || this.exporting || this.videoPreviewing || !this._historyReady) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+            }
+            this._historyTimer = setTimeout(() => {
+                this._historyTimer = 0;
+                this.commitHistoryNow();
+            }, HISTORY_DEBOUNCE_MS);
+        },
+
+        commitHistoryNow() {
+            if (this._historyPaused || this.exporting || this.videoPreviewing || !this._historyReady) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
+            const snap = this.cloneSettings(this.captureSettings());
+            const last = this.historyPast[this.historyPast.length - 1];
+            if (last && JSON.stringify(last) === JSON.stringify(snap)) {
+                return;
+            }
+            this.historyPast.push(snap);
+            if (this.historyPast.length > HISTORY_LIMIT) {
+                this.historyPast.splice(0, this.historyPast.length - HISTORY_LIMIT);
+            }
+            this.historyFuture = [];
+        },
+
+        undo() {
+            if (!this.canUndo) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
+            this._historyPaused = true;
+            const current = this.historyPast.pop();
+            this.historyFuture.push(current);
+            const previous = this.historyPast[this.historyPast.length - 1];
+            this.applySettings(this.cloneSettings(previous));
+            this._historyPaused = false;
+            this.scheduleRender();
+        },
+
+        redo() {
+            if (!this.canRedo) {
+                return;
+            }
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
+            this._historyPaused = true;
+            const next = this.historyFuture.pop();
+            this.historyPast.push(next);
+            this.applySettings(this.cloneSettings(next));
+            this._historyPaused = false;
+            this.scheduleRender();
+        },
+
+        handleHistoryShortcut(event) {
+            const target = event.target;
+            const tag = String(target?.tagName || '').toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+                return;
+            }
+            const mod = event.metaKey || event.ctrlKey;
+            if (!mod) {
+                return;
+            }
+            const key = String(event.key || '').toLowerCase();
+            if (key === 'z' && !event.shiftKey) {
+                event.preventDefault();
+                this.undo();
+                return;
+            }
+            if ((key === 'z' && event.shiftKey) || key === 'y') {
+                event.preventDefault();
+                this.redo();
+            }
         },
 
         scheduleRender() {
@@ -235,19 +488,24 @@ document.addEventListener('alpine:init', () => {
             if (!this.imageA || !this.imageB) {
                 return false;
             }
-            if (this.exportFormat === 'video') {
+            if (this.exportFormat === 'video' || this.exportFormat === 'gif') {
                 return this.usesSplit;
             }
             return this.exportFormat === 'png' || this.exportFormat === 'jpg';
         },
 
+        get usesMotionExport() {
+            return this.exportFormat === 'video' || this.exportFormat === 'gif';
+        },
+
         get canPreviewVideo() {
-            return this.hasBothImages && this.usesSplit && this.exportFormat === 'video' && !this.exporting;
+            return this.hasBothImages && this.usesSplit && this.usesMotionExport && !this.exporting;
         },
 
         get exportSizeLabel() {
-            const { width, height } =
-                this.exportFormat === 'video' ? this.resolveVideoSize() : this.resolveExportSize();
+            const { width, height } = this.usesMotionExport
+                ? this.resolveVideoSize()
+                : this.resolveExportSize();
             return `${width} × ${height}`;
         },
 
@@ -283,6 +541,303 @@ document.addEventListener('alpine:init', () => {
         setSplitStyle(id) {
             this.splitStyle = id;
             this.diagonalStyle = id;
+        },
+
+        loadPanels() {
+            try {
+                const raw = localStorage.getItem(PANELS_STORAGE_KEY);
+                const parsed = raw ? JSON.parse(raw) : null;
+                if (!parsed || typeof parsed !== 'object') {
+                    return;
+                }
+                for (const key of Object.keys(DEFAULT_PANELS)) {
+                    if (typeof parsed[key] === 'boolean') {
+                        this.panelOpen[key] = parsed[key];
+                    }
+                }
+            } catch {
+                // keep defaults
+            }
+        },
+
+        togglePanel(id) {
+            if (!Object.hasOwn(this.panelOpen, id)) {
+                return;
+            }
+            this.panelOpen[id] = !this.panelOpen[id];
+            localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(this.panelOpen));
+        },
+
+        sameColor(a, b) {
+            return String(a || '').toLowerCase() === String(b || '').toLowerCase();
+        },
+
+        groupDirty(id) {
+            if (id === 'layout') {
+                return (
+                    this.layout !== 'vertical' ||
+                    this.splitStyle !== 'straight' ||
+                    this.diagonalStyle !== 'straight' ||
+                    Number(this.diagonalAngle) !== DEFAULT_DIAGONAL_ANGLE ||
+                    Number(this.diagonalDensity) !== 1.5 ||
+                    this.overlapVariant !== 'cards' ||
+                    Number(this.overlapOffset) !== 12 ||
+                    this.overlapShadow !== true
+                );
+            }
+            if (id === 'split') {
+                return Number(this.splitPosition) !== 50;
+            }
+            if (id === 'adjust') {
+                return this.swapSides || Number(this.imagePadding) !== 0 || Number(this.imageRadius) !== 0;
+            }
+            if (id === 'labels') {
+                return (
+                    this.labelsEnabled ||
+                    this.labelA !== 'Left' ||
+                    this.labelB !== 'Right' ||
+                    this.labelBadge !== '' ||
+                    this.labelAMode !== 'preset' ||
+                    this.labelAPreset !== 'bottom-left' ||
+                    Number(this.labelAX) !== 0 ||
+                    Number(this.labelAY) !== 100 ||
+                    this.labelBMode !== 'preset' ||
+                    this.labelBPreset !== 'bottom-right' ||
+                    Number(this.labelBX) !== 100 ||
+                    Number(this.labelBY) !== 100 ||
+                    this.labelBadgeMode !== 'preset' ||
+                    this.labelBadgePreset !== 'top-center' ||
+                    Number(this.labelBadgeX) !== 50 ||
+                    Number(this.labelBadgeY) !== 0 ||
+                    Number(this.labelSize) !== 100
+                );
+            }
+            if (id === 'background') {
+                return (
+                    this.backgroundType !== 'none' ||
+                    !this.sameColor(this.backgroundBg, '#FAFAFA') ||
+                    !this.sameColor(this.backgroundFg, '#E5E5E5') ||
+                    Number(this.backgroundDensity) !== 24 ||
+                    this.backgroundPerSide ||
+                    this.backgroundBType !== 'none' ||
+                    !this.sameColor(this.backgroundBBg, '#FAFAFA') ||
+                    !this.sameColor(this.backgroundBFg, '#E5E5E5') ||
+                    Number(this.backgroundBDensity) !== 24
+                );
+            }
+            if (id === 'overlay') {
+                return (
+                    this.overlayType !== 'none' ||
+                    !this.sameColor(this.overlayColor, '#171717') ||
+                    Number(this.overlayOpacity) !== 25 ||
+                    Number(this.overlayDensity) !== 24 ||
+                    this.overlayPerSide ||
+                    this.overlayBType !== 'none' ||
+                    !this.sameColor(this.overlayBColor, '#171717') ||
+                    Number(this.overlayBOpacity) !== 25 ||
+                    Number(this.overlayBDensity) !== 24
+                );
+            }
+            if (id === 'export') {
+                return (
+                    String(this.exportScale) !== '1' ||
+                    this.exportFormat !== 'png' ||
+                    Number(this.jpgQuality) !== 92 ||
+                    Number(this.videoDuration) !== 2 ||
+                    Number(this.videoFps) !== 30 ||
+                    this.videoReverse ||
+                    this.videoContainer !== 'auto' ||
+                    this.videoTransition !== 'wipe' ||
+                    this.videoEasing !== 'linear' ||
+                    Number(this.videoHoldStart) !== 0.25 ||
+                    Number(this.videoHoldEnd) !== 0.25
+                );
+            }
+            return false;
+        },
+
+        resetGroup(id) {
+            if (id === 'layout') {
+                this.stopVideoPreview();
+                this.layout = 'vertical';
+                this.diagonalAngle = DEFAULT_DIAGONAL_ANGLE;
+                this.setSplitStyle('straight');
+                this.diagonalDensity = 1.5;
+                this.overlapVariant = 'cards';
+                this.overlapOffset = 12;
+                this.overlapShadow = true;
+                this.previewTool = 'position';
+                return;
+            }
+            if (id === 'split') {
+                this.splitPosition = 50;
+                return;
+            }
+            if (id === 'adjust') {
+                this.swapSides = false;
+                this.imagePadding = 0;
+                this.imageRadius = 0;
+                return;
+            }
+            if (id === 'labels') {
+                this.labelsEnabled = false;
+                this.labelA = 'Left';
+                this.labelB = 'Right';
+                this.labelBadge = '';
+                this.setLabelPreset('a', 'bottom-left');
+                this.setLabelPreset('b', 'bottom-right');
+                this.setLabelPreset('badge', 'top-center');
+                this.labelSize = 100;
+                return;
+            }
+            if (id === 'background') {
+                this.backgroundType = 'none';
+                this.backgroundBg = '#FAFAFA';
+                this.backgroundFg = '#E5E5E5';
+                this.backgroundDensity = 24;
+                this.backgroundPerSide = false;
+                this.backgroundEditSide = 'a';
+                this.backgroundBType = 'none';
+                this.backgroundBBg = '#FAFAFA';
+                this.backgroundBFg = '#E5E5E5';
+                this.backgroundBDensity = 24;
+                return;
+            }
+            if (id === 'overlay') {
+                this.overlayType = 'none';
+                this.overlayColor = '#171717';
+                this.overlayOpacity = 25;
+                this.overlayDensity = 24;
+                this.overlayPerSide = false;
+                this.overlayEditSide = 'a';
+                this.overlayBType = 'none';
+                this.overlayBColor = '#171717';
+                this.overlayBOpacity = 25;
+                this.overlayBDensity = 24;
+                return;
+            }
+            if (id === 'export') {
+                this.stopVideoPreview();
+                this.exportScale = '1';
+                this.exportFormat = 'png';
+                this.jpgQuality = 92;
+                this.videoDuration = 2;
+                this.videoFps = 30;
+                this.videoReverse = false;
+                this.videoContainer = 'auto';
+                this.videoTransition = 'wipe';
+                this.videoEasing = 'linear';
+                this.videoHoldStart = 0.25;
+                this.videoHoldEnd = 0.25;
+            }
+        },
+
+        applyLabelPlacementSettings(settings, suffix, side, legacyPosition) {
+            const modeKey = `label${suffix}Mode`;
+            const presetKey = `label${suffix}Preset`;
+            const xField = suffix === 'Badge' ? 'labelBadgeX' : `label${suffix}X`;
+            const yField = suffix === 'Badge' ? 'labelBadgeY' : `label${suffix}Y`;
+
+            if (settings[modeKey] === 'preset' || settings[modeKey] === 'custom') {
+                this[modeKey] = settings[modeKey];
+            }
+
+            if (LABEL_PRESET_SET.has(settings[presetKey])) {
+                this[presetKey] = settings[presetKey];
+            } else {
+                const migrated = migrateLegacyLabelPreset(legacyPosition, side);
+                if (migrated) {
+                    this[presetKey] = migrated;
+                    if (settings[modeKey] !== 'custom') {
+                        this[modeKey] = 'preset';
+                    }
+                }
+            }
+
+            if (Number.isFinite(Number(settings[xField]))) {
+                this[xField] = Math.min(100, Math.max(0, Number(settings[xField])));
+            }
+            if (Number.isFinite(Number(settings[yField]))) {
+                this[yField] = Math.min(100, Math.max(0, Number(settings[yField])));
+            }
+
+            if (this[modeKey] !== 'custom') {
+                this[modeKey] = 'preset';
+                const anchor = labelPresetAnchor(this[presetKey]);
+                this[xField] = anchor.x;
+                this[yField] = anchor.y;
+            }
+        },
+
+        setLabelPreset(side, preset) {
+            if (!LABEL_PRESET_SET.has(preset)) {
+                return;
+            }
+            const anchor = labelPresetAnchor(preset);
+            if (side === 'a') {
+                this.labelAMode = 'preset';
+                this.labelAPreset = preset;
+                this.labelAX = anchor.x;
+                this.labelAY = anchor.y;
+                return;
+            }
+            if (side === 'b') {
+                this.labelBMode = 'preset';
+                this.labelBPreset = preset;
+                this.labelBX = anchor.x;
+                this.labelBY = anchor.y;
+                return;
+            }
+            this.labelBadgeMode = 'preset';
+            this.labelBadgePreset = preset;
+            this.labelBadgeX = anchor.x;
+            this.labelBadgeY = anchor.y;
+        },
+
+        setLabelAxis(side, axis, value) {
+            const n = Math.min(100, Math.max(0, Number(value)));
+            const safe = Number.isFinite(n) ? n : 0;
+            if (side === 'a') {
+                this.labelAMode = 'custom';
+                if (axis === 'x') {
+                    this.labelAX = safe;
+                } else {
+                    this.labelAY = safe;
+                }
+                return;
+            }
+            if (side === 'b') {
+                this.labelBMode = 'custom';
+                if (axis === 'x') {
+                    this.labelBX = safe;
+                } else {
+                    this.labelBY = safe;
+                }
+                return;
+            }
+            this.labelBadgeMode = 'custom';
+            if (axis === 'x') {
+                this.labelBadgeX = safe;
+            } else {
+                this.labelBadgeY = safe;
+            }
+        },
+
+        clampLabelAxis(side, axis) {
+            const field =
+                side === 'a'
+                    ? axis === 'x'
+                        ? 'labelAX'
+                        : 'labelAY'
+                    : side === 'b'
+                      ? axis === 'x'
+                          ? 'labelBX'
+                          : 'labelBY'
+                      : axis === 'x'
+                        ? 'labelBadgeX'
+                        : 'labelBadgeY';
+            this.clampSlider(field, 0, 100);
+            this.setLabelAxis(side, axis, this[field]);
         },
 
         get showsOverlapOffset() {
@@ -321,27 +876,35 @@ document.addEventListener('alpine:init', () => {
 
             this.videoPreviewing = true;
             const token = ++this._videoPreviewToken;
-            const fps = this.videoFps;
-            const frameCount = Math.max(2, Math.round(fps * this.videoDuration));
-            const frameDelay = 1000 / fps;
             const preview = this.$refs.previewCanvas;
+            const { buildTransitionFrames } = await this.loadVideoExport();
+            const { frameDelay, frames } = buildTransitionFrames({
+                videoFps: this.videoFps,
+                videoDuration: this.videoDuration,
+                videoHoldStart: this.videoHoldStart,
+                videoHoldEnd: this.videoHoldEnd,
+                videoEasing: this.videoEasing,
+                videoReverse: this.videoReverse,
+            });
 
             try {
-                for (let i = 0; i <= frameCount; i++) {
+                for (let i = 0; i < frames.length; i++) {
                     if (token !== this._videoPreviewToken || !this.canPreviewVideo) {
                         return;
                     }
 
-                    const t = i / frameCount;
-                    const progress = this.videoReverse ? 1 - t : t;
                     const options = this.buildOptions(this.baseWidth, this.baseHeight);
-                    this.compositor.renderVideoFrame(options, this.videoTransition, clamp(progress, 0, 1));
+                    this.compositor.renderVideoFrame(
+                        options,
+                        this.videoTransition,
+                        clamp(frames[i].progress, 0, 1),
+                    );
 
                     if (preview) {
                         this.previewMetrics = this.compositor.drawPreview(preview);
                     }
 
-                    this.statusMessage = `Preview… ${Math.round((i / frameCount) * 100)}%`;
+                    this.statusMessage = `Preview… ${Math.round((i / Math.max(1, frames.length - 1)) * 100)}%`;
                     await wait(frameDelay);
                 }
 
@@ -384,17 +947,40 @@ document.addEventListener('alpine:init', () => {
                 imagePadding: this.imagePadding,
                 imageRadius: this.imageRadius,
                 labelsEnabled: this.labelsEnabled,
-                labelLeft: this.labelLeft,
-                labelRight: this.labelRight,
+                labelA: this.labelA,
+                labelB: this.labelB,
                 labelBadge: this.labelBadge,
-                labelLeftPosition: this.labelLeftPosition,
-                labelRightPosition: this.labelRightPosition,
-                labelBadgePosition: this.labelBadgePosition,
+                labelAMode: this.labelAMode,
+                labelAPreset: this.labelAPreset,
+                labelAX: this.labelAX,
+                labelAY: this.labelAY,
+                labelBMode: this.labelBMode,
+                labelBPreset: this.labelBPreset,
+                labelBX: this.labelBX,
+                labelBY: this.labelBY,
+                labelBadgeMode: this.labelBadgeMode,
+                labelBadgePreset: this.labelBadgePreset,
+                labelBadgeX: this.labelBadgeX,
+                labelBadgeY: this.labelBadgeY,
                 labelSize: this.labelSize,
                 backgroundType: this.backgroundType,
                 backgroundBg: this.backgroundBg,
                 backgroundFg: this.backgroundFg,
                 backgroundDensity: this.backgroundDensity,
+                backgroundPerSide: this.backgroundPerSide,
+                backgroundBType: this.backgroundBType,
+                backgroundBBg: this.backgroundBBg,
+                backgroundBFg: this.backgroundBFg,
+                backgroundBDensity: this.backgroundBDensity,
+                overlayType: this.overlayType,
+                overlayColor: this.overlayColor,
+                overlayOpacity: this.overlayOpacity,
+                overlayDensity: this.overlayDensity,
+                overlayPerSide: this.overlayPerSide,
+                overlayBType: this.overlayBType,
+                overlayBColor: this.overlayBColor,
+                overlayBOpacity: this.overlayBOpacity,
+                overlayBDensity: this.overlayBDensity,
                 exportScale: this.exportScale,
                 exportFormat: this.exportFormat,
                 jpgQuality: this.jpgQuality,
@@ -403,6 +989,9 @@ document.addEventListener('alpine:init', () => {
                 videoReverse: this.videoReverse,
                 videoContainer: this.videoContainer,
                 videoTransition: this.videoTransition,
+                videoEasing: this.videoEasing,
+                videoHoldStart: this.videoHoldStart,
+                videoHoldEnd: this.videoHoldEnd,
             };
         },
 
@@ -415,6 +1004,7 @@ document.addEventListener('alpine:init', () => {
             const styles = new Set(this.splitStyles.map((item) => item.id));
             const overlaps = new Set(this.overlapVariants.map((item) => item.id));
             const backgrounds = new Set(this.backgroundOptions.map((item) => item.id));
+            const overlays = new Set(this.overlayOptions.map((item) => item.id));
 
             if (layouts.has(settings.layout)) {
                 this.layout = settings.layout;
@@ -454,29 +1044,28 @@ document.addEventListener('alpine:init', () => {
             if (typeof settings.labelsEnabled === 'boolean') {
                 this.labelsEnabled = settings.labelsEnabled;
             }
-            if (typeof settings.labelLeft === 'string') {
-                this.labelLeft = settings.labelLeft;
+            if (typeof settings.labelA === 'string') {
+                this.labelA = settings.labelA;
+            } else if (typeof settings.labelLeft === 'string') {
+                this.labelA = settings.labelLeft;
             }
-            if (typeof settings.labelRight === 'string') {
-                this.labelRight = settings.labelRight;
+            if (typeof settings.labelB === 'string') {
+                this.labelB = settings.labelB;
+            } else if (typeof settings.labelRight === 'string') {
+                this.labelB = settings.labelRight;
             }
             if (typeof settings.labelBadge === 'string') {
                 this.labelBadge = settings.labelBadge;
             }
-            const positions = new Set(this.labelPositions.map((item) => item.id));
-            if (positions.has(settings.labelLeftPosition)) {
-                this.labelLeftPosition = settings.labelLeftPosition;
-            }
-            if (positions.has(settings.labelRightPosition)) {
-                this.labelRightPosition = settings.labelRightPosition;
-            }
-            if (positions.has(settings.labelBadgePosition)) {
-                this.labelBadgePosition = settings.labelBadgePosition;
-            }
+            this.applyLabelPlacementSettings(settings, 'A', 'a', settings.labelLeftPosition);
+            this.applyLabelPlacementSettings(settings, 'B', 'b', settings.labelRightPosition);
+            this.applyLabelPlacementSettings(settings, 'Badge', 'badge', settings.labelBadgePosition);
             if (Number.isFinite(Number(settings.labelSize))) {
                 this.labelSize = Math.min(160, Math.max(50, Number(settings.labelSize)));
             }
-            if (backgrounds.has(settings.backgroundType)) {
+            if (settings.backgroundType === 'solid') {
+                this.backgroundType = 'none';
+            } else if (backgrounds.has(settings.backgroundType)) {
                 this.backgroundType = settings.backgroundType;
             }
             if (typeof settings.backgroundBg === 'string') {
@@ -488,10 +1077,78 @@ document.addEventListener('alpine:init', () => {
             if (Number.isFinite(Number(settings.backgroundDensity))) {
                 this.backgroundDensity = Math.min(80, Math.max(8, Number(settings.backgroundDensity)));
             }
+            this.backgroundPerSide = Boolean(settings.backgroundPerSide);
+            if (settings.backgroundBType === 'solid') {
+                this.backgroundBType = 'none';
+            } else if (backgrounds.has(settings.backgroundBType)) {
+                this.backgroundBType = settings.backgroundBType;
+            } else if (this.backgroundPerSide) {
+                this.backgroundBType = this.backgroundType;
+                this.backgroundBBg = this.backgroundBg;
+                this.backgroundBFg = this.backgroundFg;
+                this.backgroundBDensity = this.backgroundDensity;
+            }
+            if (typeof settings.backgroundBBg === 'string') {
+                this.backgroundBBg = settings.backgroundBBg;
+            }
+            if (typeof settings.backgroundBFg === 'string') {
+                this.backgroundBFg = settings.backgroundBFg;
+            }
+            if (Number.isFinite(Number(settings.backgroundBDensity))) {
+                this.backgroundBDensity = Math.min(80, Math.max(8, Number(settings.backgroundBDensity)));
+            }
+            if (!this.backgroundPerSide) {
+                this.backgroundEditSide = 'a';
+            }
+            if (settings.overlayType === 'solid') {
+                this.overlayType = 'none';
+            } else if (overlays.has(settings.overlayType)) {
+                this.overlayType = settings.overlayType;
+            } else if (
+                ['straight', 'wavy', 'zigzag', 'scallop', 'soft', 'torn', 'pixel'].includes(settings.overlayType)
+            ) {
+                this.overlayType = 'none';
+            }
+            if (typeof settings.overlayColor === 'string') {
+                this.overlayColor = settings.overlayColor;
+            }
+            if (Number.isFinite(Number(settings.overlayOpacity))) {
+                this.overlayOpacity = Math.min(80, Math.max(5, Number(settings.overlayOpacity)));
+            }
+            if (Number.isFinite(Number(settings.overlayDensity))) {
+                this.overlayDensity = Math.min(80, Math.max(8, Number(settings.overlayDensity)));
+            }
+            this.overlayPerSide = Boolean(settings.overlayPerSide);
+            if (settings.overlayBType === 'solid') {
+                this.overlayBType = 'none';
+            } else if (overlays.has(settings.overlayBType)) {
+                this.overlayBType = settings.overlayBType;
+            } else if (
+                ['straight', 'wavy', 'zigzag', 'scallop', 'soft', 'torn', 'pixel'].includes(settings.overlayBType)
+            ) {
+                this.overlayBType = 'none';
+            } else if (this.overlayPerSide) {
+                this.overlayBType = this.overlayType;
+                this.overlayBColor = this.overlayColor;
+                this.overlayBOpacity = this.overlayOpacity;
+                this.overlayBDensity = this.overlayDensity;
+            }
+            if (typeof settings.overlayBColor === 'string') {
+                this.overlayBColor = settings.overlayBColor;
+            }
+            if (Number.isFinite(Number(settings.overlayBOpacity))) {
+                this.overlayBOpacity = Math.min(80, Math.max(5, Number(settings.overlayBOpacity)));
+            }
+            if (Number.isFinite(Number(settings.overlayBDensity))) {
+                this.overlayBDensity = Math.min(80, Math.max(8, Number(settings.overlayBDensity)));
+            }
+            if (!this.overlayPerSide) {
+                this.overlayEditSide = 'a';
+            }
             if (['1', '1.5', '2'].includes(String(settings.exportScale))) {
                 this.exportScale = String(settings.exportScale);
             }
-            if (['png', 'jpg', 'video'].includes(settings.exportFormat)) {
+            if (['png', 'jpg', 'video', 'gif'].includes(settings.exportFormat)) {
                 this.exportFormat = settings.exportFormat;
             } else if (settings.exportJpg && settings.exportPng !== true) {
                 this.exportFormat = 'jpg';
@@ -514,6 +1171,16 @@ document.addEventListener('alpine:init', () => {
             const transitions = new Set(this.videoTransitionOptions.map((item) => item.id));
             if (transitions.has(settings.videoTransition)) {
                 this.videoTransition = settings.videoTransition;
+            }
+            const easings = new Set(this.videoEasingOptions.map((item) => item.id));
+            if (easings.has(settings.videoEasing)) {
+                this.videoEasing = settings.videoEasing;
+            }
+            if (Number.isFinite(Number(settings.videoHoldStart))) {
+                this.videoHoldStart = Math.min(2, Math.max(0, Number(settings.videoHoldStart)));
+            }
+            if (Number.isFinite(Number(settings.videoHoldEnd))) {
+                this.videoHoldEnd = Math.min(2, Math.max(0, Number(settings.videoHoldEnd)));
             }
 
             this.previewTool = this.layout === 'diagonal' ? 'angle' : 'position';
@@ -590,7 +1257,20 @@ document.addEventListener('alpine:init', () => {
                 parts.push('labels');
             }
             if (settings.backgroundType) {
-                parts.push(String(settings.backgroundType));
+                parts.push(
+                    settings.backgroundPerSide && settings.backgroundBType
+                        ? `${settings.backgroundType}/${settings.backgroundBType}`
+                        : String(settings.backgroundType),
+                );
+            }
+            if (settings.overlayPerSide) {
+                const a = settings.overlayType && settings.overlayType !== 'none' ? settings.overlayType : 'none';
+                const b = settings.overlayBType && settings.overlayBType !== 'none' ? settings.overlayBType : 'none';
+                if (a !== 'none' || b !== 'none') {
+                    parts.push(`overlay ${a}/${b}`);
+                }
+            } else if (settings.overlayType && settings.overlayType !== 'none') {
+                parts.push(`overlay ${settings.overlayType}`);
             }
             return parts.join(' · ');
         },
@@ -637,7 +1317,14 @@ document.addEventListener('alpine:init', () => {
             if (!preset?.settings) {
                 return;
             }
+            this._historyPaused = true;
+            if (this._historyTimer) {
+                clearTimeout(this._historyTimer);
+                this._historyTimer = 0;
+            }
             this.applySettings(preset.settings);
+            this._historyPaused = false;
+            this.commitHistoryNow();
             this.activePresetId = preset.id;
             this.statusMessage = `Preset “${preset.name}” applied.`;
             this.closeLoadPresetModal();
@@ -827,15 +1514,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         selectExportFormat(format) {
+            this.stopVideoPreview();
             this.exportFormat = format;
-            if (format === 'video') {
+            if (format === 'video' || format === 'gif') {
                 this.loadVideoExport();
             }
         },
 
-        async recordTransitionVideo(width, height) {
-            const { recordTransitionVideo } = await this.loadVideoExport();
-            return recordTransitionVideo({
+        motionExportParams(width, height) {
+            return {
                 width,
                 height,
                 videoContainer: this.videoContainer,
@@ -843,12 +1530,25 @@ document.addEventListener('alpine:init', () => {
                 videoDuration: this.videoDuration,
                 videoReverse: this.videoReverse,
                 videoTransition: this.videoTransition,
+                videoHoldStart: this.videoHoldStart,
+                videoHoldEnd: this.videoHoldEnd,
+                videoEasing: this.videoEasing,
                 compositor: this.compositor,
                 buildOptions: (w, h) => this.buildOptions(w, h),
                 onProgress: (message) => {
                     this.statusMessage = message;
                 },
-            });
+            };
+        },
+
+        async recordTransitionVideo(width, height) {
+            const { recordTransitionVideo } = await this.loadVideoExport();
+            return recordTransitionVideo(this.motionExportParams(width, height));
+        },
+
+        async recordTransitionGif(width, height) {
+            const { recordTransitionGif } = await this.loadVideoExport();
+            return recordTransitionGif(this.motionExportParams(width, height));
         },
 
         buildOptions(width, height) {
@@ -879,12 +1579,27 @@ document.addEventListener('alpine:init', () => {
                 imageRadius: this.imageRadius,
                 labels: {
                     enabled: this.labelsEnabled,
-                    left: this.labelLeft,
-                    right: this.labelRight,
-                    badge: this.labelBadge,
-                    leftPosition: this.labelLeftPosition,
-                    rightPosition: this.labelRightPosition,
-                    badgePosition: this.labelBadgePosition,
+                    a: {
+                        text: this.labelA,
+                        mode: this.labelAMode,
+                        preset: this.labelAPreset,
+                        x: Number(this.labelAX) || 0,
+                        y: Number(this.labelAY) || 0,
+                    },
+                    b: {
+                        text: this.labelB,
+                        mode: this.labelBMode,
+                        preset: this.labelBPreset,
+                        x: Number(this.labelBX) || 0,
+                        y: Number(this.labelBY) || 0,
+                    },
+                    badge: {
+                        text: this.labelBadge,
+                        mode: this.labelBadgeMode,
+                        preset: this.labelBadgePreset,
+                        x: Number(this.labelBadgeX) || 0,
+                        y: Number(this.labelBadgeY) || 0,
+                    },
                     size: this.labelSize,
                 },
                 background: {
@@ -893,7 +1608,187 @@ document.addEventListener('alpine:init', () => {
                     fg: this.backgroundFg,
                     density: Number(this.backgroundDensity) || 24,
                 },
+                backgroundB: this.backgroundPerSide
+                    ? {
+                          type: this.backgroundBType,
+                          bg: this.backgroundBBg,
+                          fg: this.backgroundBFg,
+                          density: Number(this.backgroundBDensity) || 24,
+                      }
+                    : null,
+                overlay: {
+                    type: this.overlayType,
+                    color: this.overlayColor,
+                    opacity: Number(this.overlayOpacity) || 25,
+                    density: Number(this.overlayDensity) || 24,
+                },
+                overlayB: this.overlayPerSide
+                    ? {
+                          type: this.overlayBType,
+                          color: this.overlayBColor,
+                          opacity: Number(this.overlayBOpacity) || 25,
+                          density: Number(this.overlayBDensity) || 24,
+                      }
+                    : null,
             };
+        },
+
+        get backgroundSummary() {
+            if (this.backgroundPerSide) {
+                return `${this.backgroundType} / ${this.backgroundBType}`;
+            }
+            return this.backgroundType;
+        },
+
+        get overlaySummary() {
+            if (this.overlayPerSide) {
+                return `${this.overlayType} / ${this.overlayBType}`;
+            }
+            return this.overlayType;
+        },
+
+        get editingBackgroundB() {
+            return this.backgroundPerSide && this.backgroundEditSide === 'b';
+        },
+
+        get editingOverlayB() {
+            return this.overlayPerSide && this.overlayEditSide === 'b';
+        },
+
+        get activeBackgroundType() {
+            return this.editingBackgroundB ? this.backgroundBType : this.backgroundType;
+        },
+
+        set activeBackgroundType(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBType = value;
+            } else {
+                this.backgroundType = value;
+            }
+        },
+
+        get activeBackgroundBg() {
+            return this.editingBackgroundB ? this.backgroundBBg : this.backgroundBg;
+        },
+
+        set activeBackgroundBg(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBBg = value;
+            } else {
+                this.backgroundBg = value;
+            }
+        },
+
+        get activeBackgroundFg() {
+            return this.editingBackgroundB ? this.backgroundBFg : this.backgroundFg;
+        },
+
+        set activeBackgroundFg(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBFg = value;
+            } else {
+                this.backgroundFg = value;
+            }
+        },
+
+        get activeBackgroundDensity() {
+            return this.editingBackgroundB ? this.backgroundBDensity : this.backgroundDensity;
+        },
+
+        set activeBackgroundDensity(value) {
+            if (this.editingBackgroundB) {
+                this.backgroundBDensity = value;
+            } else {
+                this.backgroundDensity = value;
+            }
+        },
+
+        get activeOverlayType() {
+            return this.editingOverlayB ? this.overlayBType : this.overlayType;
+        },
+
+        set activeOverlayType(value) {
+            if (this.editingOverlayB) {
+                this.overlayBType = value;
+            } else {
+                this.overlayType = value;
+            }
+        },
+
+        get activeOverlayColor() {
+            return this.editingOverlayB ? this.overlayBColor : this.overlayColor;
+        },
+
+        set activeOverlayColor(value) {
+            if (this.editingOverlayB) {
+                this.overlayBColor = value;
+            } else {
+                this.overlayColor = value;
+            }
+        },
+
+        get activeOverlayOpacity() {
+            return this.editingOverlayB ? this.overlayBOpacity : this.overlayOpacity;
+        },
+
+        set activeOverlayOpacity(value) {
+            if (this.editingOverlayB) {
+                this.overlayBOpacity = value;
+            } else {
+                this.overlayOpacity = value;
+            }
+        },
+
+        get activeOverlayDensity() {
+            return this.editingOverlayB ? this.overlayBDensity : this.overlayDensity;
+        },
+
+        set activeOverlayDensity(value) {
+            if (this.editingOverlayB) {
+                this.overlayBDensity = value;
+            } else {
+                this.overlayDensity = value;
+            }
+        },
+
+        setBackgroundPerSide(enabled) {
+            const on = Boolean(enabled);
+            if (on && !this.backgroundPerSide) {
+                this.backgroundBType = this.backgroundType;
+                this.backgroundBBg = this.backgroundBg;
+                this.backgroundBFg = this.backgroundFg;
+                this.backgroundBDensity = this.backgroundDensity;
+            }
+            this.backgroundPerSide = on;
+            if (!on) {
+                this.backgroundEditSide = 'a';
+            }
+        },
+
+        setOverlayPerSide(enabled) {
+            const on = Boolean(enabled);
+            if (on && !this.overlayPerSide) {
+                this.overlayBType = this.overlayType;
+                this.overlayBColor = this.overlayColor;
+                this.overlayBOpacity = this.overlayOpacity;
+                this.overlayBDensity = this.overlayDensity;
+            }
+            this.overlayPerSide = on;
+            if (!on) {
+                this.overlayEditSide = 'a';
+            }
+        },
+
+        clampActiveBackgroundDensity() {
+            this.clampSlider(this.editingBackgroundB ? 'backgroundBDensity' : 'backgroundDensity', 8, 80);
+        },
+
+        clampActiveOverlayOpacity() {
+            this.clampSlider(this.editingOverlayB ? 'overlayBOpacity' : 'overlayOpacity', 5, 80);
+        },
+
+        clampActiveOverlayDensity() {
+            this.clampSlider(this.editingOverlayB ? 'overlayBDensity' : 'overlayDensity', 8, 80);
         },
 
         render() {
@@ -1106,13 +2001,21 @@ document.addEventListener('alpine:init', () => {
             try {
                 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
-                if (this.exportFormat === 'video') {
+                if (this.exportFormat === 'video' || this.exportFormat === 'gif') {
                     if (!this.usesSplit) {
-                        this.statusMessage = 'Video export needs a split layout (not Overlap).';
+                        this.statusMessage = `${this.exportFormat === 'gif' ? 'GIF' : 'Video'} export needs a split layout (not Overlap).`;
                         return;
                     }
 
                     const { width, height } = this.resolveVideoSize();
+                    if (this.exportFormat === 'gif') {
+                        this.statusMessage = 'Encoding GIF…';
+                        const { blob, extension, label } = await this.recordTransitionGif(width, height);
+                        this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${extension}`);
+                        this.statusMessage = `Exported ${label} (${width} × ${height}).`;
+                        return;
+                    }
+
                     this.statusMessage = 'Recording video…';
                     const { blob, extension, label } = await this.recordTransitionVideo(width, height);
                     this.downloadBlob(blob, `pairframe-${width}x${height}-${stamp}.${extension}`);

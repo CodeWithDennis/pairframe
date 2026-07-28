@@ -1,4 +1,4 @@
-import { paintBackground, paintSplitMask } from './patterns.js';
+import { paintBackground, paintOverlay, paintSplitMask } from './patterns.js';
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -85,12 +85,17 @@ export function createCompositor() {
     const frameACtx = frameACanvas.getContext('2d', { willReadFrequently: false });
     const frameBCanvas = document.createElement('canvas');
     const frameBCtx = frameBCanvas.getContext('2d', { willReadFrequently: false });
+    const overlayCanvas = document.createElement('canvas');
+    const overlayCtx = overlayCanvas.getContext('2d', { willReadFrequently: false });
+    const bgBCanvas = document.createElement('canvas');
+    const bgBCtx = bgBCanvas.getContext('2d', { willReadFrequently: false });
 
     let lastOptions = null;
     let bgKey = '';
     let sideAKey = '';
     let sideBKey = '';
     let maskKey = '';
+    let overlayKey = '';
     let transitionFrameKey = '';
 
     function resolveSides(options) {
@@ -102,24 +107,156 @@ export function createCompositor() {
         return { sideA: light, sideB: dark };
     }
 
-    function blitBackground(targetCtx, width, height, background) {
-        const bg = background || { type: 'solid', bg: '#FAFAFA' };
-        const key = [
-            width,
-            height,
-            bg.type || 'solid',
-            bg.bg || '',
-            bg.fg || '',
-            Number(bg.density) || 0,
-        ].join('|');
+    function backgroundLayerKey(layer) {
+        const bg = layer || {};
+        return [bg.type || 'none', bg.bg || '', bg.fg || '', Number(bg.density) || 0].join(':');
+    }
+
+    function overlayLayerKey(layer) {
+        const ov = layer || {};
+        return [ov.type || 'none', ov.color || '', Number(ov.opacity) || 0, Number(ov.density) || 0].join(':');
+    }
+
+    function splitMaskOptions(options) {
+        return {
+            layoutFamily: options.layoutFamily || options.layout,
+            layoutVariant: options.layoutVariant,
+            splitPosition: options.splitPosition,
+            softEdge: options.softEdge,
+            flipDirection: options.flipDirection,
+            invertMask: options.invertMask,
+            maskDensity: options.maskDensity,
+            diagonalAngle: options.diagonalAngle,
+        };
+    }
+
+    function ensureLayerSideBMask(width, height, options) {
+        const family = options.layoutFamily || options.layout;
+        if (family === 'overlap') {
+            const flip = Boolean(options.flipDirection) || Boolean(options.swapSides);
+            const key = `overlap-half|${width}|${height}|${flip ? 1 : 0}`;
+            if (maskKey === key && maskCanvas.width === width && maskCanvas.height === height) {
+                return maskCanvas;
+            }
+            ensureCanvasSize(maskCanvas, width, height);
+            maskCtx.clearRect(0, 0, width, height);
+            maskCtx.fillStyle = '#ffffff';
+            if (flip) {
+                maskCtx.fillRect(0, 0, Math.ceil(width / 2), height);
+            } else {
+                maskCtx.fillRect(Math.floor(width / 2), 0, Math.ceil(width / 2), height);
+            }
+            maskKey = key;
+            return maskCanvas;
+        }
+
+        ensureMask(width, height, splitMaskOptions(options));
+        return maskCanvas;
+    }
+
+    function blitBackground(targetCtx, width, height, background, backgroundB, options) {
+        const bg = background || { type: 'none', bg: '#FAFAFA' };
+        const hasB = Boolean(backgroundB && typeof backgroundB === 'object');
+        const maskPart = hasB
+            ? [
+                  options?.layoutFamily || options?.layout || '',
+                  options?.layoutVariant || '',
+                  Number(options?.splitPosition) || 0,
+                  Number(options?.softEdge) || 0,
+                  Boolean(options?.flipDirection) ? 1 : 0,
+                  Boolean(options?.invertMask) ? 1 : 0,
+                  Boolean(options?.swapSides) ? 1 : 0,
+                  Number(options?.maskDensity) || 0,
+                  Number(options?.diagonalAngle) || 0,
+              ].join('|')
+            : '';
+        const key = [width, height, backgroundLayerKey(bg), hasB ? backgroundLayerKey(backgroundB) : '', maskPart].join(
+            '|',
+        );
 
         if (bgKey !== key) {
             ensureCanvasSize(bgCanvas, width, height);
             paintBackground(bgCtx, width, height, bg);
+
+            if (hasB) {
+                ensureCanvasSize(bgBCanvas, width, height);
+                paintBackground(bgBCtx, width, height, backgroundB);
+                const mask = ensureLayerSideBMask(width, height, options || {});
+                bgBCtx.globalCompositeOperation = 'destination-in';
+                bgBCtx.drawImage(mask, 0, 0);
+                bgBCtx.globalCompositeOperation = 'source-over';
+                bgCtx.drawImage(bgBCanvas, 0, 0);
+            }
+
             bgKey = key;
         }
 
         targetCtx.drawImage(bgCanvas, 0, 0);
+    }
+
+    function blitOverlay(targetCtx, width, height, overlay, overlayB, options) {
+        const layerA = overlay || { type: 'none' };
+        const layerB = overlayB && typeof overlayB === 'object' ? overlayB : null;
+        const typeA = layerA.type || 'none';
+        const typeB = layerB ? layerB.type || 'none' : 'none';
+        const hasB = Boolean(layerB);
+        const activeA = typeA && typeA !== 'none';
+        const activeB = hasB && typeB && typeB !== 'none';
+
+        if (!activeA && !activeB) {
+            return;
+        }
+
+        if (!hasB) {
+            const key = [width, height, overlayLayerKey(layerA)].join('|');
+            if (overlayKey !== key) {
+                clearCanvas(overlayCtx, overlayCanvas, width, height);
+                paintOverlay(overlayCtx, width, height, layerA);
+                overlayKey = key;
+            }
+            targetCtx.drawImage(overlayCanvas, 0, 0);
+            return;
+        }
+
+        const maskPart = [
+            options?.layoutFamily || options?.layout || '',
+            options?.layoutVariant || '',
+            Number(options?.splitPosition) || 0,
+            Number(options?.softEdge) || 0,
+            Boolean(options?.flipDirection) ? 1 : 0,
+            Boolean(options?.invertMask) ? 1 : 0,
+            Boolean(options?.swapSides) ? 1 : 0,
+            Number(options?.maskDensity) || 0,
+            Number(options?.diagonalAngle) || 0,
+        ].join('|');
+        const key = [width, height, overlayLayerKey(layerA), overlayLayerKey(layerB), maskPart].join('|');
+
+        if (overlayKey !== key) {
+            clearCanvas(overlayCtx, overlayCanvas, width, height);
+            const mask = ensureLayerSideBMask(width, height, options || {});
+
+            if (activeA) {
+                clearCanvas(sideCtx, sideCanvas, width, height);
+                paintOverlay(sideCtx, width, height, layerA);
+                sideCtx.globalCompositeOperation = 'destination-out';
+                sideCtx.drawImage(mask, 0, 0);
+                sideCtx.globalCompositeOperation = 'source-over';
+                overlayCtx.drawImage(sideCanvas, 0, 0);
+            }
+
+            if (activeB) {
+                clearCanvas(sideCtx, sideCanvas, width, height);
+                paintOverlay(sideCtx, width, height, layerB);
+                sideCtx.globalCompositeOperation = 'destination-in';
+                sideCtx.drawImage(mask, 0, 0);
+                sideCtx.globalCompositeOperation = 'source-over';
+                overlayCtx.drawImage(sideCanvas, 0, 0);
+            }
+
+            overlayKey = key;
+        }
+
+        targetCtx.drawImage(overlayCanvas, 0, 0);
     }
 
     function imageCacheKey(image, width, height, fitMode) {
@@ -171,7 +308,7 @@ export function createCompositor() {
     }
 
     function renderOverlap(options, width, height, sideA, sideB) {
-        blitBackground(ctx, width, height, options.background);
+        blitBackground(ctx, width, height, options.background, options.backgroundB, options);
 
         const variant = options.layoutVariant || 'cards';
         const offsetXRaw = Number(options.overlapOffsetX);
@@ -272,7 +409,7 @@ export function createCompositor() {
     }
 
     function renderSplit(options, width, height, sideA, sideB) {
-        blitBackground(ctx, width, height, options.background);
+        blitBackground(ctx, width, height, options.background, options.backgroundB, options);
 
         const content = contentPadding(width, height, options);
         const radiusPct = clamp(Number(options.imageRadius) || 0, 0, 50) / 100;
@@ -298,17 +435,7 @@ export function createCompositor() {
             fitMode,
         );
 
-        const maskOptions = {
-            layoutFamily: options.layoutFamily || options.layout,
-            layoutVariant: options.layoutVariant,
-            splitPosition: options.splitPosition,
-            softEdge: options.softEdge,
-            flipDirection: options.flipDirection,
-            invertMask: options.invertMask,
-            maskDensity: options.maskDensity,
-            diagonalAngle: options.diagonalAngle,
-        };
-        ensureMask(content.width, content.height, maskOptions);
+        ensureMask(content.width, content.height, splitMaskOptions(options));
 
         ctx.save();
         if (radius > 0) {
@@ -340,7 +467,14 @@ export function createCompositor() {
         const { sideA, sideB } = resolveSides(options);
 
         if (!sideA && !sideB) {
-            blitBackground(ctx, width, height, options.background || { type: 'solid', bg: '#FAFAFA' });
+            blitBackground(
+                ctx,
+                width,
+                height,
+                options.background || { type: 'none', bg: '#FAFAFA' },
+                options.backgroundB,
+                options,
+            );
             ctx.fillStyle = '#A3A3A3';
             ctx.font = '500 18px Inter, sans-serif';
             ctx.textAlign = 'center';
@@ -355,9 +489,37 @@ export function createCompositor() {
             renderSplit(options, width, height, sideA || sideB, sideB || sideA);
         }
 
+        blitOverlay(ctx, width, height, options.overlay, options.overlayB, options);
         paintLabels(ctx, width, height, options);
 
         return canvas;
+    }
+
+    function labelPlacementXY(placement) {
+        const anchors = {
+            'top-left': { x: 0, y: 0 },
+            'top-center': { x: 50, y: 0 },
+            'top-right': { x: 100, y: 0 },
+            'middle-left': { x: 0, y: 50 },
+            'middle-center': { x: 50, y: 50 },
+            'middle-right': { x: 100, y: 50 },
+            'bottom-left': { x: 0, y: 100 },
+            'bottom-center': { x: 50, y: 100 },
+            'bottom-right': { x: 100, y: 100 },
+        };
+        if (placement?.mode === 'custom') {
+            return {
+                x: clamp(Number(placement.x) || 0, 0, 100),
+                y: clamp(Number(placement.y) || 0, 0, 100),
+            };
+        }
+        return anchors[placement?.preset] || anchors['bottom-left'];
+    }
+
+    function labelAlignFromXY(x, y) {
+        const alignX = x <= 25 ? 'left' : x >= 75 ? 'right' : 'center';
+        const alignY = y <= 25 ? 'top' : y >= 75 ? 'bottom' : 'middle';
+        return { alignX, alignY };
     }
 
     function paintLabels(labelCtx, width, height, options) {
@@ -366,37 +528,65 @@ export function createCompositor() {
             return;
         }
 
-        const leftText = String(labels.left || '').trim();
-        const rightText = String(labels.right || '').trim();
-        const badgeText = String(labels.badge || '').trim();
-        if (!leftText && !rightText && !badgeText) {
+        // Support legacy left/right shape during transition
+        const placementA = labels.a || {
+            text: labels.left,
+            mode: 'preset',
+            preset:
+                labels.leftPosition === 'top'
+                    ? 'top-left'
+                    : labels.leftPosition === 'middle'
+                      ? 'middle-left'
+                      : 'bottom-left',
+        };
+        const placementB = labels.b || {
+            text: labels.right,
+            mode: 'preset',
+            preset:
+                labels.rightPosition === 'top'
+                    ? 'top-right'
+                    : labels.rightPosition === 'middle'
+                      ? 'middle-right'
+                      : 'bottom-right',
+        };
+        const placementBadge =
+            labels.badge && typeof labels.badge === 'object'
+                ? labels.badge
+                : {
+                      text: typeof labels.badge === 'string' ? labels.badge : '',
+                      mode: 'preset',
+                      preset:
+                          labels.badgePosition === 'bottom'
+                              ? 'bottom-center'
+                              : labels.badgePosition === 'middle'
+                                ? 'middle-center'
+                                : 'top-center',
+                  };
+
+        const textA = String(placementA.text || '').trim();
+        const textB = String(placementB.text || '').trim();
+        const textBadge = String(placementBadge.text || '').trim();
+        if (!textA && !textB && !textBadge) {
             return;
         }
 
-        const family = options.layoutFamily || options.layout || 'vertical';
-        const leftPosition = labels.leftPosition || 'bottom';
-        const rightPosition = labels.rightPosition || 'bottom';
-        const badgePosition = labels.badgePosition || 'top';
         const scale = clamp(Number(labels.size) || 100, 50, 160) / 100;
         const fontSize = Math.max(11, Math.round(Math.min(width, height) * 0.032 * scale));
         const inset = Math.max(10, Math.round(Math.min(width, height) * 0.025));
+        // Anchor to the full content box so split-position changes do not drag labels around.
         const content = contentPadding(width, height, options);
-        const horizontal = family === 'horizontal' || (family === 'fade' && (options.layoutVariant || '') === 'tb');
 
-        const axisPoint = (start, size, position) => {
-            if (position === 'top') {
-                return start + inset + fontSize * 0.9;
-            }
-            if (position === 'bottom') {
-                return start + size - inset - fontSize * 0.9;
-            }
-            return start + size / 2;
-        };
-
-        const drawPill = (text, x, y, align = 'center') => {
+        const drawPill = (text, placement) => {
             if (!text) {
                 return;
             }
+
+            const { x: px, y: py } = labelPlacementXY(placement);
+            const { alignX, alignY } = labelAlignFromXY(px, py);
+            const innerW = Math.max(1, content.width - inset * 2);
+            const innerH = Math.max(1, content.height - inset * 2);
+            const x = content.x + inset + (innerW * px) / 100;
+            const y = content.y + inset + (innerH * py) / 100;
 
             labelCtx.save();
             labelCtx.font = `600 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`;
@@ -407,37 +597,32 @@ export function createCompositor() {
             const padY = fontSize * 0.42;
             const pillW = textWidth + padX * 2;
             const pillH = fontSize + padY * 2;
+
             let left = x - pillW / 2;
-            if (align === 'left') {
+            if (alignX === 'left') {
                 left = x;
-            } else if (align === 'right') {
+            } else if (alignX === 'right') {
                 left = x - pillW;
             }
-            const topY = y - pillH / 2;
+
+            let topY = y - pillH / 2;
+            if (alignY === 'top') {
+                topY = y;
+            } else if (alignY === 'bottom') {
+                topY = y - pillH;
+            }
 
             labelCtx.fillStyle = 'rgba(23, 23, 23, 0.72)';
             roundRectPath(labelCtx, left, topY, pillW, pillH, pillH / 2);
             labelCtx.fill();
             labelCtx.fillStyle = '#ffffff';
-            labelCtx.fillText(text, left + pillW / 2, y + 0.5);
+            labelCtx.fillText(text, left + pillW / 2, topY + pillH / 2 + 0.5);
             labelCtx.restore();
         };
 
-        if (horizontal) {
-            const topY = content.y + inset + fontSize * 0.9;
-            const bottomY = content.y + content.height - inset - fontSize * 0.9;
-            const leftAlign = leftPosition === 'top' ? 'left' : leftPosition === 'bottom' ? 'right' : 'center';
-            const rightAlign = rightPosition === 'top' ? 'left' : rightPosition === 'bottom' ? 'right' : 'center';
-            drawPill(leftText, axisPoint(content.x, content.width, leftPosition), topY, leftAlign);
-            drawPill(rightText, axisPoint(content.x, content.width, rightPosition), bottomY, rightAlign);
-        } else {
-            drawPill(leftText, content.x + inset, axisPoint(content.y, content.height, leftPosition), 'left');
-            drawPill(rightText, content.x + content.width - inset, axisPoint(content.y, content.height, rightPosition), 'right');
-        }
-
-        if (badgeText) {
-            drawPill(badgeText, content.x + content.width / 2, axisPoint(content.y, content.height, badgePosition), 'center');
-        }
+        drawPill(textA, placementA);
+        drawPill(textB, placementB);
+        drawPill(textBadge, placementBadge);
     }
 
     function drawPreview(previewCanvas) {
@@ -493,7 +678,6 @@ export function createCompositor() {
     }
 
     function transitionFramesCacheKey(options, width, height) {
-        const bg = options.background || {};
         const light = options.lightImage;
         const dark = options.darkImage;
         return [
@@ -509,10 +693,10 @@ export function createCompositor() {
             Number(options.imagePadding) || 0,
             Number(options.imageRadius) || 0,
             options.fitMode || 'cover',
-            bg.type || '',
-            bg.bg || '',
-            bg.fg || '',
-            Number(bg.density) || 0,
+            backgroundLayerKey(options.background),
+            options.backgroundB ? backgroundLayerKey(options.backgroundB) : '',
+            overlayLayerKey(options.overlay),
+            options.overlayB ? overlayLayerKey(options.overlayB) : '',
             light?.src || '',
             light?.naturalWidth || light?.width || 0,
             light?.naturalHeight || light?.height || 0,
