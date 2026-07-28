@@ -1136,13 +1136,13 @@ document.addEventListener('alpine:init', () => {
                 this.overlayOpacity = Math.min(80, Math.max(5, Number(settings.overlayOpacity)));
             }
             if (Number.isFinite(Number(settings.overlayDensity))) {
-                this.overlayDensity = Math.min(80, Math.max(8, Number(settings.overlayDensity)));
+                this.overlayDensity = Math.min(100, Math.max(1, Number(settings.overlayDensity)));
             }
             if (['top', 'bottom', 'left', 'right'].includes(settings.overlayEdge)) {
                 this.overlayEdge = settings.overlayEdge;
             }
             if (Number.isFinite(Number(settings.overlayCoverage))) {
-                this.overlayCoverage = Math.min(50, Math.max(10, Number(settings.overlayCoverage)));
+                this.overlayCoverage = Math.min(100, Math.max(0, Number(settings.overlayCoverage)));
             }
             this.overlayPerSide = Boolean(settings.overlayPerSide);
             if (settings.overlayBType === 'solid' || this.isOverlayEdgeStyle(settings.overlayBType)) {
@@ -1162,7 +1162,7 @@ document.addEventListener('alpine:init', () => {
                 this.overlayBOpacity = Math.min(80, Math.max(5, Number(settings.overlayBOpacity)));
             }
             if (Number.isFinite(Number(settings.overlayBDensity))) {
-                this.overlayBDensity = Math.min(80, Math.max(8, Number(settings.overlayBDensity)));
+                this.overlayBDensity = Math.min(100, Math.max(1, Number(settings.overlayBDensity)));
             }
             if (this.isOverlayEdgeStyle(this.overlayType)) {
                 this.overlayPerSide = false;
@@ -1843,11 +1843,11 @@ document.addEventListener('alpine:init', () => {
         },
 
         clampActiveOverlayDensity() {
-            this.clampSlider(this.editingOverlayB ? 'overlayBDensity' : 'overlayDensity', 8, 80);
+            this.clampSlider(this.editingOverlayB ? 'overlayBDensity' : 'overlayDensity', 1, 100);
         },
 
         clampOverlayCoverage() {
-            this.clampSlider('overlayCoverage', 10, 50);
+            this.clampSlider('overlayCoverage', 0, 100);
         },
 
         render() {

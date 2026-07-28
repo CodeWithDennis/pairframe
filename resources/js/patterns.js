@@ -191,7 +191,7 @@ function paintEdgeWashOverlay(ctx, width, height, options = {}) {
     const color = options.color || '#171717';
     const opacity = clamp((Number(options.opacity) ?? 25) / 100, 0.05, 0.8);
     const density = clamp(Number(options.density) || 24, 0.1, 100);
-    const coverage = clamp(Number(options.coverage) ?? 28, 10, 50) / 100;
+    const coverage = clamp(Number(options.coverage) ?? 28, 0, 100) / 100;
     const edge = ['top', 'bottom', 'left', 'right'].includes(options.edge) ? options.edge : 'top';
     const horizontal = edge === 'top' || edge === 'bottom';
     const fromStart = edge === 'top' || edge === 'left';

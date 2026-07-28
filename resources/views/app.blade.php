@@ -908,8 +908,8 @@
                                 <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
-                                        min="10"
-                                        max="50"
+                                        min="0"
+                                        max="100"
                                         step="1"
                                         class="slider-value"
                                         x-model.number="overlayCoverage"
@@ -919,15 +919,15 @@
                                     <span>%</span>
                                 </div>
                             </div>
-                            <input type="range" min="10" max="50" step="1" class="w-full" x-model.number="overlayCoverage">
+                            <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="overlayCoverage">
                         </div>
                         <div x-show="showsOverlayPatternDensity || showsOverlayEdgeDensity" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Density</label>
                                 <input
                                     type="number"
-                                    min="8"
-                                    max="80"
+                                    min="1"
+                                    max="100"
                                     step="1"
                                     class="slider-value"
                                     x-model.number="activeOverlayDensity"
@@ -935,7 +935,7 @@
                                     @keydown.enter="$event.target.blur()"
                                 >
                             </div>
-                            <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="activeOverlayDensity">
+                            <input type="range" min="1" max="100" step="1" class="w-full" x-model.number="activeOverlayDensity">
                         </div>
                     </div>
                     </div>
