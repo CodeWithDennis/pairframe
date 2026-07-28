@@ -1,6 +1,4 @@
-import gifenc from 'gifenc';
-
-const { GIFEncoder, quantize, applyPalette } = gifenc;
+import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
