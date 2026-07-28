@@ -840,7 +840,7 @@
                         </button>
                     </div>
                     <div class="sidebar-group-body" x-show="panelOpen.overlay" x-cloak>
-                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink" x-show="!isOverlayEdgeStyle()" x-cloak>
+                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
                         <span class="font-medium">Per side</span>
                         <input
                             type="checkbox"
@@ -849,7 +849,7 @@
                             @change="setOverlayPerSide($event.target.checked)"
                         >
                     </label>
-                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="overlayPerSide && !isOverlayEdgeStyle()" x-cloak>
+                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="overlayPerSide" x-cloak>
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'a')" @click="overlayEditSide = 'a'">A</button>
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'b')" @click="overlayEditSide = 'b'">B</button>
                     </div>
@@ -888,46 +888,13 @@
                             </div>
                             <input type="range" min="5" max="80" step="1" class="w-full" x-model.number="activeOverlayOpacity">
                         </div>
-                        <div x-show="isOverlayEdgeStyle()" x-cloak>
-                            <p class="mb-2 text-xs font-medium text-lumis-ink">Edge</p>
-                            <div class="flex flex-wrap gap-1.5">
-                                <template x-for="option in overlayEdgeOptions" :key="option.id">
-                                    <button
-                                        type="button"
-                                        class="px-2.5 py-1.5 text-xs font-medium"
-                                        :class="segmentClass(overlayEdge === option.id)"
-                                        @click="overlayEdge = option.id"
-                                        x-text="option.label"
-                                    ></button>
-                                </template>
-                            </div>
-                        </div>
-                        <div x-show="isOverlayEdgeStyle()" x-cloak>
-                            <div class="mb-1 flex items-center justify-between gap-2">
-                                <label class="text-xs font-medium text-lumis-ink">Coverage</label>
-                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        step="1"
-                                        class="slider-value"
-                                        x-model.number="overlayCoverage"
-                                        @blur="clampOverlayCoverage()"
-                                        @keydown.enter="$event.target.blur()"
-                                    >
-                                    <span>%</span>
-                                </div>
-                            </div>
-                            <input type="range" min="0" max="100" step="1" class="w-full" x-model.number="overlayCoverage">
-                        </div>
-                        <div x-show="showsOverlayPatternDensity || showsOverlayEdgeDensity" x-cloak>
+                        <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Density</label>
                                 <input
                                     type="number"
-                                    min="1"
-                                    max="100"
+                                    min="8"
+                                    max="80"
                                     step="1"
                                     class="slider-value"
                                     x-model.number="activeOverlayDensity"
@@ -935,7 +902,7 @@
                                     @keydown.enter="$event.target.blur()"
                                 >
                             </div>
-                            <input type="range" min="1" max="100" step="1" class="w-full" x-model.number="activeOverlayDensity">
+                            <input type="range" min="8" max="80" step="1" class="w-full" x-model.number="activeOverlayDensity">
                         </div>
                     </div>
                     </div>

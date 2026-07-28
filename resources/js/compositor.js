@@ -114,14 +114,7 @@ export function createCompositor() {
 
     function overlayLayerKey(layer) {
         const ov = layer || {};
-        return [
-            ov.type || 'none',
-            ov.color || '',
-            Number(ov.opacity) || 0,
-            Number(ov.density) || 0,
-            ov.edge || '',
-            Number(ov.coverage) || 0,
-        ].join(':');
+        return [ov.type || 'none', ov.color || '', Number(ov.opacity) || 0, Number(ov.density) || 0].join(':');
     }
 
     function splitMaskOptions(options) {
