@@ -118,13 +118,13 @@ document.addEventListener('alpine:init', () => {
             { id: 'bottom-right', short: 'BR' },
         ],
 
-        backgroundType: 'dots',
+        backgroundType: 'none',
         backgroundBg: '#FAFAFA',
         backgroundFg: '#E5E5E5',
         backgroundDensity: 24,
         backgroundPerSide: false,
         backgroundEditSide: 'a',
-        backgroundBType: 'dots',
+        backgroundBType: 'none',
         backgroundBBg: '#FAFAFA',
         backgroundBFg: '#E5E5E5',
         backgroundBDensity: 24,
@@ -133,6 +133,8 @@ document.addEventListener('alpine:init', () => {
         overlayColor: '#171717',
         overlayOpacity: 25,
         overlayDensity: 24,
+        overlayEdge: 'top',
+        overlayCoverage: 28,
         overlayPerSide: false,
         overlayEditSide: 'a',
         overlayBType: 'none',
@@ -230,7 +232,7 @@ document.addEventListener('alpine:init', () => {
         ],
 
         backgroundOptions: [
-            { id: 'solid', label: 'Solid' },
+            { id: 'none', label: 'None' },
             { id: 'dots', label: 'Dots' },
             { id: 'grid', label: 'Grid' },
             { id: 'stripes', label: 'Stripes' },
@@ -247,6 +249,20 @@ document.addEventListener('alpine:init', () => {
             { id: 'diagonal', label: 'Diagonal' },
             { id: 'chevron', label: 'Chevron' },
             { id: 'noise', label: 'Noise' },
+            { id: 'straight', label: 'Straight' },
+            { id: 'wavy', label: 'Wavy' },
+            { id: 'zigzag', label: 'Zigzag' },
+            { id: 'scallop', label: 'Scallop' },
+            { id: 'soft', label: 'Soft' },
+            { id: 'torn', label: 'Torn' },
+            { id: 'pixel', label: 'Pixel' },
+        ],
+
+        overlayEdgeOptions: [
+            { id: 'top', label: 'Top' },
+            { id: 'bottom', label: 'Bottom' },
+            { id: 'left', label: 'Left' },
+            { id: 'right', label: 'Right' },
         ],
 
         init() {
@@ -309,6 +325,8 @@ document.addEventListener('alpine:init', () => {
                     this.overlayColor,
                     this.overlayOpacity,
                     this.overlayDensity,
+                    this.overlayEdge,
+                    this.overlayCoverage,
                     this.overlayPerSide,
                     this.overlayBType,
                     this.overlayBColor,
@@ -614,12 +632,12 @@ document.addEventListener('alpine:init', () => {
             }
             if (id === 'background') {
                 return (
-                    this.backgroundType !== 'dots' ||
+                    this.backgroundType !== 'none' ||
                     !this.sameColor(this.backgroundBg, '#FAFAFA') ||
                     !this.sameColor(this.backgroundFg, '#E5E5E5') ||
                     Number(this.backgroundDensity) !== 24 ||
                     this.backgroundPerSide ||
-                    this.backgroundBType !== 'dots' ||
+                    this.backgroundBType !== 'none' ||
                     !this.sameColor(this.backgroundBBg, '#FAFAFA') ||
                     !this.sameColor(this.backgroundBFg, '#E5E5E5') ||
                     Number(this.backgroundBDensity) !== 24
@@ -631,6 +649,8 @@ document.addEventListener('alpine:init', () => {
                     !this.sameColor(this.overlayColor, '#171717') ||
                     Number(this.overlayOpacity) !== 25 ||
                     Number(this.overlayDensity) !== 24 ||
+                    this.overlayEdge !== 'top' ||
+                    Number(this.overlayCoverage) !== 28 ||
                     this.overlayPerSide ||
                     this.overlayBType !== 'none' ||
                     !this.sameColor(this.overlayBColor, '#171717') ||
@@ -691,13 +711,13 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             if (id === 'background') {
-                this.backgroundType = 'dots';
+                this.backgroundType = 'none';
                 this.backgroundBg = '#FAFAFA';
                 this.backgroundFg = '#E5E5E5';
                 this.backgroundDensity = 24;
                 this.backgroundPerSide = false;
                 this.backgroundEditSide = 'a';
-                this.backgroundBType = 'dots';
+                this.backgroundBType = 'none';
                 this.backgroundBBg = '#FAFAFA';
                 this.backgroundBFg = '#E5E5E5';
                 this.backgroundBDensity = 24;
@@ -708,6 +728,8 @@ document.addEventListener('alpine:init', () => {
                 this.overlayColor = '#171717';
                 this.overlayOpacity = 25;
                 this.overlayDensity = 24;
+                this.overlayEdge = 'top';
+                this.overlayCoverage = 28;
                 this.overlayPerSide = false;
                 this.overlayEditSide = 'a';
                 this.overlayBType = 'none';
@@ -976,6 +998,8 @@ document.addEventListener('alpine:init', () => {
                 overlayColor: this.overlayColor,
                 overlayOpacity: this.overlayOpacity,
                 overlayDensity: this.overlayDensity,
+                overlayEdge: this.overlayEdge,
+                overlayCoverage: this.overlayCoverage,
                 overlayPerSide: this.overlayPerSide,
                 overlayBType: this.overlayBType,
                 overlayBColor: this.overlayBColor,
@@ -1063,7 +1087,9 @@ document.addEventListener('alpine:init', () => {
             if (Number.isFinite(Number(settings.labelSize))) {
                 this.labelSize = Math.min(160, Math.max(50, Number(settings.labelSize)));
             }
-            if (backgrounds.has(settings.backgroundType)) {
+            if (settings.backgroundType === 'solid') {
+                this.backgroundType = 'none';
+            } else if (backgrounds.has(settings.backgroundType)) {
                 this.backgroundType = settings.backgroundType;
             }
             if (typeof settings.backgroundBg === 'string') {
@@ -1076,7 +1102,9 @@ document.addEventListener('alpine:init', () => {
                 this.backgroundDensity = Math.min(80, Math.max(8, Number(settings.backgroundDensity)));
             }
             this.backgroundPerSide = Boolean(settings.backgroundPerSide);
-            if (backgrounds.has(settings.backgroundBType)) {
+            if (settings.backgroundBType === 'solid') {
+                this.backgroundBType = 'none';
+            } else if (backgrounds.has(settings.backgroundBType)) {
                 this.backgroundBType = settings.backgroundBType;
             } else if (this.backgroundPerSide) {
                 this.backgroundBType = this.backgroundType;
@@ -1110,13 +1138,19 @@ document.addEventListener('alpine:init', () => {
             if (Number.isFinite(Number(settings.overlayDensity))) {
                 this.overlayDensity = Math.min(80, Math.max(8, Number(settings.overlayDensity)));
             }
+            if (['top', 'bottom', 'left', 'right'].includes(settings.overlayEdge)) {
+                this.overlayEdge = settings.overlayEdge;
+            }
+            if (Number.isFinite(Number(settings.overlayCoverage))) {
+                this.overlayCoverage = Math.min(50, Math.max(10, Number(settings.overlayCoverage)));
+            }
             this.overlayPerSide = Boolean(settings.overlayPerSide);
-            if (settings.overlayBType === 'solid') {
+            if (settings.overlayBType === 'solid' || this.isOverlayEdgeStyle(settings.overlayBType)) {
                 this.overlayBType = 'none';
             } else if (overlays.has(settings.overlayBType)) {
                 this.overlayBType = settings.overlayBType;
             } else if (this.overlayPerSide) {
-                this.overlayBType = this.overlayType;
+                this.overlayBType = this.isOverlayEdgeStyle(this.overlayType) ? 'none' : this.overlayType;
                 this.overlayBColor = this.overlayColor;
                 this.overlayBOpacity = this.overlayOpacity;
                 this.overlayBDensity = this.overlayDensity;
@@ -1129,6 +1163,9 @@ document.addEventListener('alpine:init', () => {
             }
             if (Number.isFinite(Number(settings.overlayBDensity))) {
                 this.overlayBDensity = Math.min(80, Math.max(8, Number(settings.overlayBDensity)));
+            }
+            if (this.isOverlayEdgeStyle(this.overlayType)) {
+                this.overlayPerSide = false;
             }
             if (!this.overlayPerSide) {
                 this.overlayEditSide = 'a';
@@ -1609,15 +1646,20 @@ document.addEventListener('alpine:init', () => {
                     color: this.overlayColor,
                     opacity: Number(this.overlayOpacity) || 25,
                     density: Number(this.overlayDensity) || 24,
+                    edge: this.overlayEdge,
+                    coverage: Number(this.overlayCoverage) || 28,
                 },
-                overlayB: this.overlayPerSide
-                    ? {
-                          type: this.overlayBType,
-                          color: this.overlayBColor,
-                          opacity: Number(this.overlayBOpacity) || 25,
-                          density: Number(this.overlayBDensity) || 24,
-                      }
-                    : null,
+                overlayB:
+                    this.overlayPerSide &&
+                    !this.isOverlayEdgeStyle(this.overlayType) &&
+                    this.isOverlayPatternStyle(this.overlayBType)
+                        ? {
+                              type: this.overlayBType,
+                              color: this.overlayBColor,
+                              opacity: Number(this.overlayBOpacity) || 25,
+                              density: Number(this.overlayBDensity) || 24,
+                          }
+                        : null,
             };
         },
 
@@ -1696,6 +1738,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         set activeOverlayType(value) {
+            if (this.isOverlayEdgeStyle(value)) {
+                this.overlayType = value;
+                this.overlayPerSide = false;
+                this.overlayEditSide = 'a';
+                return;
+            }
             if (this.editingOverlayB) {
                 this.overlayBType = value;
             } else {
@@ -1739,6 +1787,22 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        isOverlayEdgeStyle(type = this.activeOverlayType) {
+            return ['straight', 'wavy', 'zigzag', 'scallop', 'soft', 'torn', 'pixel'].includes(type);
+        },
+
+        isOverlayPatternStyle(type = this.activeOverlayType) {
+            return ['dots', 'grid', 'stripes', 'diagonal', 'chevron', 'noise'].includes(type);
+        },
+
+        get showsOverlayEdgeDensity() {
+            return this.isOverlayEdgeStyle() && this.activeOverlayType !== 'straight' && this.activeOverlayType !== 'soft';
+        },
+
+        get showsOverlayPatternDensity() {
+            return this.isOverlayPatternStyle();
+        },
+
         setBackgroundPerSide(enabled) {
             const on = Boolean(enabled);
             if (on && !this.backgroundPerSide) {
@@ -1755,8 +1819,11 @@ document.addEventListener('alpine:init', () => {
 
         setOverlayPerSide(enabled) {
             const on = Boolean(enabled);
+            if (on && this.isOverlayEdgeStyle(this.overlayType)) {
+                return;
+            }
             if (on && !this.overlayPerSide) {
-                this.overlayBType = this.overlayType;
+                this.overlayBType = this.isOverlayPatternStyle(this.overlayType) ? this.overlayType : 'none';
                 this.overlayBColor = this.overlayColor;
                 this.overlayBOpacity = this.overlayOpacity;
                 this.overlayBDensity = this.overlayDensity;
@@ -1777,6 +1844,10 @@ document.addEventListener('alpine:init', () => {
 
         clampActiveOverlayDensity() {
             this.clampSlider(this.editingOverlayB ? 'overlayBDensity' : 'overlayDensity', 8, 80);
+        },
+
+        clampOverlayCoverage() {
+            this.clampSlider('overlayCoverage', 10, 50);
         },
 
         render() {

@@ -139,7 +139,7 @@ function paintPatternMarks(ctx, width, height, type, color, density, noiseMode =
 }
 
 export function paintBackground(ctx, width, height, options = {}) {
-    const type = options.type || 'solid';
+    const type = options.type || 'none';
     const bg = options.bg || '#FAFAFA';
     const fg = options.fg || '#E5E5E5';
     const density = clamp(Number(options.density) || 24, 4, 120);
@@ -148,7 +148,7 @@ export function paintBackground(ctx, width, height, options = {}) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, width, height);
 
-    if (type !== 'solid') {
+    if (type && type !== 'none' && type !== 'solid') {
         paintPatternMarks(ctx, width, height, type, fg, density, 'opaque', bg);
     }
 
@@ -156,12 +156,17 @@ export function paintBackground(ctx, width, height, options = {}) {
 }
 
 /**
- * Translucent pattern marks on top of composed images (no base fill).
- * options: { type, color, opacity (0-100), density }
+ * Translucent pattern marks or edge-wash shapes on top of composed images (no base fill).
+ * options: { type, color, opacity (0-100), density, edge, coverage }
  */
 export function paintOverlay(ctx, width, height, options = {}) {
     const type = options.type || 'none';
     if (!type || type === 'none' || type === 'solid') {
+        return;
+    }
+
+    if (isOverlayEdgeStyle(type)) {
+        paintEdgeWashOverlay(ctx, width, height, options);
         return;
     }
 
@@ -173,6 +178,44 @@ export function paintOverlay(ctx, width, height, options = {}) {
     ctx.globalAlpha = opacity;
     paintPatternMarks(ctx, width, height, type, color, density, 'grain');
     ctx.restore();
+}
+
+const OVERLAY_EDGE_STYLES = new Set(['straight', 'wavy', 'zigzag', 'scallop', 'soft', 'torn', 'pixel']);
+
+function isOverlayEdgeStyle(type) {
+    return OVERLAY_EDGE_STYLES.has(type);
+}
+
+function paintEdgeWashOverlay(ctx, width, height, options = {}) {
+    const type = options.type || 'wavy';
+    const color = options.color || '#171717';
+    const opacity = clamp((Number(options.opacity) ?? 25) / 100, 0.05, 0.8);
+    const density = clamp(Number(options.density) || 24, 0.1, 100);
+    const coverage = clamp(Number(options.coverage) ?? 28, 10, 50) / 100;
+    const edge = ['top', 'bottom', 'left', 'right'].includes(options.edge) ? options.edge : 'top';
+    const horizontal = edge === 'top' || edge === 'bottom';
+    const fromStart = edge === 'top' || edge === 'left';
+
+    const layer = document.createElement('canvas');
+    layer.width = width;
+    layer.height = height;
+    const layerCtx = layer.getContext('2d');
+    paintSplitMask(layerCtx, width, height, {
+        layoutFamily: horizontal ? 'horizontal' : 'vertical',
+        layoutVariant: type,
+        splitPosition: fromStart ? coverage : 1 - coverage,
+        flipDirection: fromStart,
+        maskDensity: density,
+        softEdge: type === 'soft' ? Math.max(18, Math.min(width, height) * 0.045) : 0,
+    });
+
+    layerCtx.globalCompositeOperation = 'source-in';
+    layerCtx.fillStyle = color;
+    layerCtx.globalAlpha = opacity;
+    layerCtx.fillRect(0, 0, width, height);
+    layerCtx.globalCompositeOperation = 'source-over';
+
+    ctx.drawImage(layer, 0, 0);
 }
 
 function blurMask(maskCtx, width, height, softEdge) {

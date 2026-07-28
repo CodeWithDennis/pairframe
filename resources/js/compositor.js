@@ -109,12 +109,19 @@ export function createCompositor() {
 
     function backgroundLayerKey(layer) {
         const bg = layer || {};
-        return [bg.type || 'solid', bg.bg || '', bg.fg || '', Number(bg.density) || 0].join(':');
+        return [bg.type || 'none', bg.bg || '', bg.fg || '', Number(bg.density) || 0].join(':');
     }
 
     function overlayLayerKey(layer) {
         const ov = layer || {};
-        return [ov.type || 'none', ov.color || '', Number(ov.opacity) || 0, Number(ov.density) || 0].join(':');
+        return [
+            ov.type || 'none',
+            ov.color || '',
+            Number(ov.opacity) || 0,
+            Number(ov.density) || 0,
+            ov.edge || '',
+            Number(ov.coverage) || 0,
+        ].join(':');
     }
 
     function splitMaskOptions(options) {
@@ -155,7 +162,7 @@ export function createCompositor() {
     }
 
     function blitBackground(targetCtx, width, height, background, backgroundB, options) {
-        const bg = background || { type: 'solid', bg: '#FAFAFA' };
+        const bg = background || { type: 'none', bg: '#FAFAFA' };
         const hasB = Boolean(backgroundB && typeof backgroundB === 'object');
         const maskPart = hasB
             ? [
@@ -471,7 +478,7 @@ export function createCompositor() {
                 ctx,
                 width,
                 height,
-                options.background || { type: 'solid', bg: '#FAFAFA' },
+                options.background || { type: 'none', bg: '#FAFAFA' },
                 options.backgroundB,
                 options,
             );

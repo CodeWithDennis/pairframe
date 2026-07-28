@@ -100,18 +100,26 @@
     }
 
     input.slider-value {
-        width: 3.25rem;
+        width: auto;
+        min-width: 1ch;
         margin: 0;
-        padding: 0;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
+        padding: 0.1rem 0.3rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-subtle);
+        background: color-mix(in srgb, var(--color-lumis-ink) 5%, transparent);
         color: #a1a1aa;
         font-size: 0.75rem;
         line-height: 1rem;
         text-align: right;
         outline: none;
+        field-sizing: content;
         -moz-appearance: textfield;
+        cursor: text;
+    }
+
+    input.slider-value:hover {
+        color: var(--color-lumis-ink);
+        background: color-mix(in srgb, var(--color-lumis-ink) 8%, transparent);
     }
 
     input.preset-name-input,
@@ -142,6 +150,40 @@
 
     input.slider-value:focus {
         color: var(--color-lumis-ink);
+        border-color: var(--color-lumis-panel-line);
+        background: color-mix(in srgb, var(--color-lumis-ink) 8%, transparent);
+    }
+
+    /* Keep number + unit in one subtle chip when wrapped together */
+    .slider-value-wrap {
+        gap: 0.05rem;
+        padding: 0.1rem 0.3rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-subtle);
+        background: color-mix(in srgb, var(--color-lumis-ink) 5%, transparent);
+    }
+
+    .slider-value-wrap:hover {
+        background: color-mix(in srgb, var(--color-lumis-ink) 8%, transparent);
+    }
+
+    .slider-value-wrap:focus-within {
+        border-color: var(--color-lumis-panel-line);
+        background: color-mix(in srgb, var(--color-lumis-ink) 8%, transparent);
+    }
+
+    .slider-value-wrap input.slider-value {
+        width: auto;
+        min-width: 1ch;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        field-sizing: content;
+    }
+
+    .slider-value-wrap input.slider-value:hover,
+    .slider-value-wrap input.slider-value:focus {
+        background: transparent;
     }
 
     input.slider-value::-webkit-inner-spin-button,

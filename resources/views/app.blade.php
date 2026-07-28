@@ -295,7 +295,7 @@
                         <div x-show="layout === 'diagonal'" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Angle</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="-180"
@@ -337,7 +337,7 @@
                         <div x-show="showsOverlapOffset" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Offset</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="0"
@@ -384,7 +384,7 @@
                     <div class="sidebar-group-body" x-show="panelOpen.split" x-cloak>
                     <div class="mb-1 flex items-center justify-between gap-2">
                         <label class="text-xs font-medium text-lumis-ink">Position</label>
-                        <div class="flex items-center text-xs text-zinc-400">
+                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                             <input
                                 type="number"
                                 min="0"
@@ -432,7 +432,7 @@
                     <div class="mb-3" x-show="usesSplit" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Padding</label>
-                            <div class="flex items-center text-xs text-zinc-400">
+                            <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                 <input
                                     type="number"
                                     min="0"
@@ -451,7 +451,7 @@
                     <div>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Radius</label>
-                            <div class="flex items-center text-xs text-zinc-400">
+                            <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                 <input
                                     type="number"
                                     min="0"
@@ -519,7 +519,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2">
                                         <label class="text-xs font-medium text-lumis-ink">X</label>
-                                        <div class="flex items-center text-xs text-zinc-400">
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                             <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelAX" @input="setLabelAxis('a', 'x', labelAX)" @blur="clampLabelAxis('a', 'x')" @keydown.enter="$event.target.blur()">
                                             <span>%</span>
                                         </div>
@@ -529,7 +529,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2">
                                         <label class="text-xs font-medium text-lumis-ink">Y</label>
-                                        <div class="flex items-center text-xs text-zinc-400">
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                             <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelAY" @input="setLabelAxis('a', 'y', labelAY)" @blur="clampLabelAxis('a', 'y')" @keydown.enter="$event.target.blur()">
                                             <span>%</span>
                                         </div>
@@ -557,7 +557,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2">
                                         <label class="text-xs font-medium text-lumis-ink">X</label>
-                                        <div class="flex items-center text-xs text-zinc-400">
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                             <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBX" @input="setLabelAxis('b', 'x', labelBX)" @blur="clampLabelAxis('b', 'x')" @keydown.enter="$event.target.blur()">
                                             <span>%</span>
                                         </div>
@@ -567,7 +567,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2">
                                         <label class="text-xs font-medium text-lumis-ink">Y</label>
-                                        <div class="flex items-center text-xs text-zinc-400">
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                             <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBY" @input="setLabelAxis('b', 'y', labelBY)" @blur="clampLabelAxis('b', 'y')" @keydown.enter="$event.target.blur()">
                                             <span>%</span>
                                         </div>
@@ -595,7 +595,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2">
                                         <label class="text-xs font-medium text-lumis-ink">X</label>
-                                        <div class="flex items-center text-xs text-zinc-400">
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                             <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBadgeX" @input="setLabelAxis('badge', 'x', labelBadgeX)" @blur="clampLabelAxis('badge', 'x')" @keydown.enter="$event.target.blur()">
                                             <span>%</span>
                                         </div>
@@ -605,7 +605,7 @@
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2">
                                         <label class="text-xs font-medium text-lumis-ink">Y</label>
-                                        <div class="flex items-center text-xs text-zinc-400">
+                                        <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                             <input type="number" min="0" max="100" step="1" class="slider-value" x-model.number="labelBadgeY" @input="setLabelAxis('badge', 'y', labelBadgeY)" @blur="clampLabelAxis('badge', 'y')" @keydown.enter="$event.target.blur()">
                                             <span>%</span>
                                         </div>
@@ -617,7 +617,7 @@
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Size</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="50"
@@ -791,12 +791,12 @@
                             <input type="color" x-model="activeBackgroundBg">
                             Base
                         </label>
-                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" x-show="activeBackgroundType !== 'solid'" x-cloak>
+                        <label class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400" x-show="activeBackgroundType !== 'none'" x-cloak>
                             <input type="color" x-model="activeBackgroundFg">
                             Pattern
                         </label>
                     </div>
-                    <div class="mt-3" x-show="activeBackgroundType !== 'solid'" x-cloak>
+                    <div class="mt-3" x-show="activeBackgroundType !== 'none'" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">Density</label>
                             <input
@@ -840,7 +840,7 @@
                         </button>
                     </div>
                     <div class="sidebar-group-body" x-show="panelOpen.overlay" x-cloak>
-                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink">
+                    <label class="flex items-center justify-between gap-2 text-xs text-lumis-ink" x-show="!isOverlayEdgeStyle()" x-cloak>
                         <span class="font-medium">Per side</span>
                         <input
                             type="checkbox"
@@ -849,7 +849,7 @@
                             @change="setOverlayPerSide($event.target.checked)"
                         >
                     </label>
-                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="overlayPerSide" x-cloak>
+                    <div class="mt-3 flex flex-wrap gap-1.5" x-show="overlayPerSide && !isOverlayEdgeStyle()" x-cloak>
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'a')" @click="overlayEditSide = 'a'">A</button>
                         <button type="button" class="px-2.5 py-1.5 text-xs font-medium" :class="segmentClass(overlayEditSide === 'b')" @click="overlayEditSide = 'b'">B</button>
                     </div>
@@ -872,7 +872,7 @@
                         <div>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Opacity</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="5"
@@ -888,7 +888,40 @@
                             </div>
                             <input type="range" min="5" max="80" step="1" class="w-full" x-model.number="activeOverlayOpacity">
                         </div>
-                        <div>
+                        <div x-show="isOverlayEdgeStyle()" x-cloak>
+                            <p class="mb-2 text-xs font-medium text-lumis-ink">Edge</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="option in overlayEdgeOptions" :key="option.id">
+                                    <button
+                                        type="button"
+                                        class="px-2.5 py-1.5 text-xs font-medium"
+                                        :class="segmentClass(overlayEdge === option.id)"
+                                        @click="overlayEdge = option.id"
+                                        x-text="option.label"
+                                    ></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div x-show="isOverlayEdgeStyle()" x-cloak>
+                            <div class="mb-1 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-lumis-ink">Coverage</label>
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
+                                    <input
+                                        type="number"
+                                        min="10"
+                                        max="50"
+                                        step="1"
+                                        class="slider-value"
+                                        x-model.number="overlayCoverage"
+                                        @blur="clampOverlayCoverage()"
+                                        @keydown.enter="$event.target.blur()"
+                                    >
+                                    <span>%</span>
+                                </div>
+                            </div>
+                            <input type="range" min="10" max="50" step="1" class="w-full" x-model.number="overlayCoverage">
+                        </div>
+                        <div x-show="showsOverlayPatternDensity || showsOverlayEdgeDensity" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Density</label>
                                 <input
@@ -965,7 +998,7 @@
                     <div x-show="exportFormat === 'jpg'" x-cloak>
                         <div class="mb-1 flex items-center justify-between gap-2">
                             <label class="text-xs font-medium text-lumis-ink">JPG quality</label>
-                            <div class="flex items-center text-xs text-zinc-400">
+                            <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                 <input
                                     type="number"
                                     min="50"
@@ -1032,7 +1065,7 @@
                         <div x-show="usesSplit" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Duration</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="1"
@@ -1051,7 +1084,7 @@
                         <div x-show="usesSplit" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Hold start</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="0"
@@ -1070,7 +1103,7 @@
                         <div x-show="usesSplit" x-cloak>
                             <div class="mb-1 flex items-center justify-between gap-2">
                                 <label class="text-xs font-medium text-lumis-ink">Hold end</label>
-                                <div class="flex items-center text-xs text-zinc-400">
+                                <div class="slider-value-wrap flex items-center text-xs text-zinc-400">
                                     <input
                                         type="number"
                                         min="0"
